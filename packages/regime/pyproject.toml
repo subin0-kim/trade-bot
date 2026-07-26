@@ -1,0 +1,17 @@
+[project]
+name = "trading-regime"
+version = "0.1.0"
+description = "시장 레짐 판별 — 지수 데이터 기반 상승/하락/횡보 분류"
+requires-python = ">=3.11"
+dependencies = ["trading-core", "trading-indicators"]
+
+[tool.uv.sources]
+trading-core = { workspace = true }
+trading-indicators = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/regime"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

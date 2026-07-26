@@ -1,0 +1,25 @@
+[project]
+name = "stock-trade-bot"
+version = "0.1.0"
+description = "멀티 봇 자동매매 모노레포 (KIS / Upbit)"
+requires-python = ">=3.11"
+dependencies = [
+    "bot-scalper",
+    "trading-indicators",
+    "strategy-kit",
+    "trading-backtest",
+    "trading-regime",
+]
+
+[tool.uv.workspace]
+members = ["packages/*", "apps/*"]
+
+[tool.uv.sources]
+bot-scalper = { workspace = true }
+trading-indicators = { workspace = true }
+strategy-kit = { workspace = true }
+trading-backtest = { workspace = true }
+trading-regime = { workspace = true }
+
+[tool.uv]
+package = false

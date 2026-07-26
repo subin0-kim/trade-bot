@@ -1,0 +1,10 @@
+[project]
+name = "trading-core"
+version = "0.1.0"
+description = "거래 도메인 모델 + 브로커 추상화 + 리스크/정책 엔진 (브로커 비종속)"
+requires-python = ">=3.11"
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

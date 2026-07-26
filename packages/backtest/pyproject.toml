@@ -1,0 +1,18 @@
+[project]
+name = "trading-backtest"
+version = "0.1.0"
+description = "전략 백테스트 엔진 — MTF·비용·look-ahead 안전"
+requires-python = ">=3.11"
+dependencies = ["trading-core", "trading-indicators", "strategy-kit"]
+
+[tool.uv.sources]
+trading-core = { workspace = true }
+trading-indicators = { workspace = true }
+strategy-kit = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/backtest"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

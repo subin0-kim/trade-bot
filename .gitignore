@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+build/
+
+# 런타임 데이터 (이벤트 로그, 캐시)
+data/*
+!data/.gitkeep
+
+# 비밀정보 — 인증정보는 repo 밖(~/KIS/config)에 보관한다
+*.secret.*
+kis_devlp.yaml
+
+# IDE / OS
+.idea/
+.vscode/
+Thumbs.db

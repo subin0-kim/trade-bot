@@ -1,0 +1,17 @@
+[project]
+name = "broker-kis"
+version = "0.1.0"
+description = "한국투자증권 Open API 어댑터 (trading-core Broker 구현)"
+requires-python = ">=3.11"
+dependencies = [
+    "trading-core",
+    "requests>=2.31",
+    "pyyaml>=6.0",
+]
+
+[tool.uv.sources]
+trading-core = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

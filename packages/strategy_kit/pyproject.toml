@@ -1,0 +1,17 @@
+[project]
+name = "strategy-kit"
+version = "0.1.0"
+description = "전략 모듈 분해 프레임워크 — 진입/필터/청산/사이징 조립식 전략"
+requires-python = ">=3.11"
+dependencies = ["trading-core", "trading-indicators"]
+
+[tool.uv.sources]
+trading-core = { workspace = true }
+trading-indicators = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/strategy_kit"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

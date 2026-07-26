@@ -1,0 +1,16 @@
+[project]
+name = "trading-indicators"
+version = "0.1.0"
+description = "기술적 지표 계산 (순수 파이썬, 시리즈 정렬 반환)"
+requires-python = ">=3.11"
+dependencies = ["trading-core"]
+
+[tool.uv.sources]
+trading-core = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/indicators"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

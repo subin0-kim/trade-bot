@@ -1,0 +1,20 @@
+[project]
+name = "bot-scalper"
+version = "0.1.0"
+description = "단타봇 — 분봉 기반 데이트레이딩"
+requires-python = ">=3.11"
+dependencies = [
+    "trading-core",
+    "broker-kis",
+]
+
+[project.scripts]
+bot-scalper = "bot_scalper.main:main"
+
+[tool.uv.sources]
+trading-core = { workspace = true }
+broker-kis = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
