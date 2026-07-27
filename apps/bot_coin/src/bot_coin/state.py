@@ -20,7 +20,7 @@ class CoinPosition:
     quantity: str            # Decimal 문자열 (소수점 8자리)
     entry_price: str
     entry_ts: str            # ISO
-    strategy: str            # "bull_breakout" | "shock_follow"
+    strategy: str            # "btc_core" | "bull_breakout" | "shock_follow"
     highest_close: str = "0"
     exit_due: str = ""       # shock 포지션의 청산 예정 시각 (ISO)
 

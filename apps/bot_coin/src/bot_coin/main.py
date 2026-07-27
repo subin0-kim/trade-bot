@@ -1,9 +1,12 @@
 """코인봇 — 사이클당 1회 실행 (권장: 시간당 1회, 작업 스케줄러).
 
-전략 (2026-07 분할검증 생존 2종):
-  1. bull_breakout: BTC 일봉 MA10/30/60 정배열일 때만 알트 breakout_momo(240m) 가동, 그외 현금
-     — 백테스트 +78.7%/PF 1.61 (B&H -75% 구간), 분할 전반 +71.7/후반 +3.8
-  2. shock_follow: BTC 09~10시 |수익률|≥1% → 10시대에 알트 바스켓 매수 → 익일 09시 청산
+전략 (2026-07 검증 — 레짐은 앙상블 2/3 다수결):
+  1. btc_core: 레짐 초록불이면 예산 50%로 BTC 홀드, 꺼지면 청산
+     — 게이트 B&H +120.7%/MDD 30.8, 분할 전반 +75.0/후반 +26.1 ✓ (최강 구성)
+  2. bull_breakout: 초록불일 때 나머지 예산 50%로 알트 breakout_momo(240m) 위성 운용
+     — 단독은 분할 취약(자산곡선 분할 후반 음수)이라 위성으로 강등.
+       코어+위성 50:50 결합 +99.3%/MDD 23.6, 분할 전반 +91.6/후반 +4.0 ✓
+  3. shock_follow: BTC 09~10시 |수익률|≥1% → 10시대에 알트 바스켓 매수 → 익일 09시 청산
      — 분할 전반 +0.84%/후반 +0.68% per 이벤트일
 
 부정지식 필터 (역시 실측 기반):
@@ -30,7 +33,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from broker_upbit import UpbitBroker, align_price
-from indicators import closes, sma
+from indicators import closes, roc, sma, supertrend
 from strategy_kit import MarketView, OpenPosition, build_preset
 from trading_core import JsonlEventLog, OrderRequest, OrderSide, OrderType
 
@@ -49,6 +52,7 @@ MAX_BREAKOUT_POSITIONS = 4
 SHOCK_THRESHOLD_PCT = 1.0
 SHOCK_BASKET_N = 10          # 쇼크 이벤트 시 매수할 알트 수 (24h 거래대금 상위)
 SURGE_SKIP_PCT = 20.0        # 전일 급등 진입 금지 임계
+CORE_FRACTION = Decimal("0.5")   # 초록불 시 BTC 코어 홀드 비중 (검증: 50:50 결합 ✓)
 FEE = Decimal("0.0005")
 
 
@@ -69,24 +73,36 @@ def completed_240m(broker: UpbitBroker, symbol: str, count: int = 120):
 
 
 def btc_regime(broker: UpbitBroker) -> str:
-    """BTC 일봉 MA10/30/60 정배열 여부. 오늘(진행 중) 봉 제외.
+    """BTC 일봉 앙상블 레짐 — {ROC30>0, SuperTrend(10,3), MA10>MA30} 2/3 다수결.
 
-    주의: 업비트 일봉 경계는 09:00 KST — 백테스트(자정 경계)와 미세하게 다르다.
-    전방 검증에서 이 괴리의 영향을 관찰한다 (wiki/crypto-condition-switching 한계 참조).
+    2026-07 기준 심사: 3개 강건 가족의 다수결이 '가장 나쁜 반쪽' 최고
+    (BTC 코어 +120.7%, 전반 +75/후반 +26 ✓ — wiki/crypto-condition-switching).
+    단일 기준(MA10/30/60 정배열)은 후반 취약으로 교체됨.
+
+    주의: 업비트 일봉 경계 09:00 KST vs 백테스트 자정 경계 — 전방 검증 관찰 대상.
     """
     daily = broker.get_daily_candles(
-        "KRW-BTC", date.today() - timedelta(days=100), date.today()
+        "KRW-BTC", date.today() - timedelta(days=150), date.today()
     )
     done = [c for c in daily if c.ts.date() < date.today()]
     xs = closes(done)
-    ma10, ma30, ma60 = sma(xs, 10), sma(xs, 30), sma(xs, 60)
-    if ma60[-1] is None:
+    if len(xs) < 65:
         return "unknown"
-    if xs[-1] > ma60[-1] and ma10[-1] > ma30[-1]:
-        return "bull"
-    if xs[-1] < ma60[-1] and ma10[-1] < ma30[-1]:
-        return "bear"
-    return "neutral"
+    votes = 0
+    r30 = roc(xs, 30)
+    if r30[-1] is not None and r30[-1] > 0:
+        votes += 1
+    st, _ = supertrend(done, 10, 3.0)
+    if st[-1] == 1:
+        votes += 1
+    ma10, ma30 = sma(xs, 10), sma(xs, 30)
+    if ma10[-1] is not None and ma30[-1] is not None and ma10[-1] > ma30[-1]:
+        votes += 1
+    logger.info("레짐 투표: ROC30 %s, SuperTrend %s, MA10>30 %s → %d/3",
+                "○" if (r30[-1] or 0) > 0 else "×",
+                "○" if st[-1] == 1 else "×",
+                "○" if (ma10[-1] or 0) > (ma30[-1] or 1) else "×", votes)
+    return "bull" if votes >= 2 else "off"
 
 
 def btc_open_shock(broker: UpbitBroker) -> float | None:
@@ -190,6 +206,11 @@ def main():
             if pos.exit_due and now >= datetime.fromisoformat(pos.exit_due):
                 place_sell(broker, state, events, pos, "쇼크 익일 09시 청산", args.live)
             continue
+        if pos.strategy == "btc_core":
+            # 코어는 돌파 규칙이 아니라 레짐 신호로만 청산
+            if regime != "bull":
+                place_sell(broker, state, events, pos, f"레짐 이탈({regime}) — 코어 청산", args.live)
+            continue
         # bull_breakout: 완성 240m 봉으로 전략 청산 규칙 평가
         bars = completed_240m(broker, symbol, 200)
         if len(bars) < 60:
@@ -211,7 +232,14 @@ def main():
         elif regime != "bull":
             place_sell(broker, state, events, pos, f"레짐 이탈({regime}) — 현금화", args.live)
 
-    # ---------- 2) 쇼크 이벤트 (btc_shock_alt_follow) ----------
+    # ---------- 2) BTC 코어 홀드 (btc_core) ----------
+    if regime == "bull" and "KRW-BTC" not in state.positions:
+        core_amount = min(Decimal(args.budget) * CORE_FRACTION,
+                          Decimal(state.cash) * Decimal("0.95"))
+        place_buy(broker, state, events, "KRW-BTC", core_amount, "btc_core",
+                  ["레짐 초록불(앙상블 2/3) — 코어 홀드 진입"], args.live)
+
+    # ---------- 3) 쇼크 이벤트 (btc_shock_alt_follow) ----------
     today_str = date.today().isoformat()
     if state.last_shock_date != today_str and 10 <= now.hour <= 11:
         shock = btc_open_shock(broker)
@@ -239,7 +267,7 @@ def main():
         elif shock is not None:
             state.last_shock_date = today_str  # 오늘은 평온 — 재확인 불필요
 
-    # ---------- 3) bull_breakout 신규 진입 ----------
+    # ---------- 4) bull_breakout 신규 진입 (위성 — 예산의 나머지 50%) ----------
     breakout_held = sum(1 for p in state.positions.values() if p.strategy == "bull_breakout")
     slots = MAX_BREAKOUT_POSITIONS - breakout_held
     if regime == "bull" and slots > 0:
@@ -258,7 +286,8 @@ def main():
         candidates.sort(key=lambda c: (-c[0], c[1]))
         if candidates:
             logger.info("돌파 후보 %d개 (슬롯 %d)", len(candidates), slots)
-        per_slot = Decimal(args.budget) * Decimal("0.9") / MAX_BREAKOUT_POSITIONS
+        per_slot = (Decimal(args.budget) * (1 - CORE_FRACTION)
+                    * Decimal("0.9") / MAX_BREAKOUT_POSITIONS)
         for score, symbol, decision in candidates[:slots]:
             surge = prev_day_surge(broker, symbol)
             if surge >= SURGE_SKIP_PCT:
@@ -270,7 +299,7 @@ def main():
     elif regime != "bull":
         logger.info("레짐 %s — 신규 돌파 진입 없음", regime)
 
-    # ---------- 4) 자산 스냅샷 + 저장 ----------
+    # ---------- 5) 자산 스냅샷 + 저장 ----------
     equity = Decimal(state.cash)
     for symbol, pos in state.positions.items():
         try:
