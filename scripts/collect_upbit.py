@@ -78,7 +78,9 @@ def collect_symbol(broker: UpbitBroker, symbol: str, unit: int, days: int) -> in
                 continue
 
     target_start = datetime.now() - timedelta(days=days)
-    cursor: str | None = None
+    # 이어받기 최적화: 기존 데이터가 있으면 그 시작점부터 과거로 이어간다
+    # (매번 현재부터 다시 훑으면 이미 받은 구간을 재조회해 콜을 두 배로 낭비)
+    cursor: str | None = min(existing) if existing else None
     added = 0
 
     while True:
