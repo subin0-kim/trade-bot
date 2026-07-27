@@ -47,6 +47,31 @@ sources:
 **보관 소재**: ① 스윙 검색식(2fndu2K7Tv0 — 시총·등락률·수렴·신고가 근접 등 조건 다수가 수치 명시,
 청산 없어 스크리너로만), ② '구름 안 종가 3연속 → 청산' 아이디어 (자석구름 영상의 유일한 수치 규칙)
 
+## 3차 조사 (2026-07-27): 문헌 5종 — 기존 풀에 없는 유형
+
+| 프리셋 | 규칙 요약 | 원 출처 | 게이트 판정 |
+|---|---|---|---|
+| `three_day_reversion` | 3일 연속 고점·저점 하락 + 200일선 위 → MA5 복귀 청산 | Connors & Alvarez, *High Probability ETF Trading* (2009) | 보류 — 전 구간 비음수·최저 MDD지만 스위칭 66.6%로 챔피언(68.3) 미달 |
+| `double_seven` | 200일선 위 + 7일 최저 종가 매수 → 7일 최고 종가 매도 | Connors & Alvarez *Double Seven* | ❌ 탈락 — 상승슬롯 투입 시 34.2% (거래 610회 비용 잠식) |
+| `ibs_reversion` | IBS<0.2 매수 → IBS>0.8 청산 | Internal Bar Strength (QuantifiedStrategies / Alvarez) | ❌ 탈락 — 횡보 -1.60%, 거래 989~998회 |
+| `minervini_breakout` | 트렌드템플릿 7조건 + 50일 신고가 | Minervini, *Trade Like a Stock Market Wizard* (2013) | 판정불가 — 거래 7~81회 (조건 과엄격) |
+| `clenow_momentum` | 연율 지수회귀 기울기×R² ≥40 + 100일선/갭 필터 | Clenow, *Stocks on the Move* (2015) | 판정불가 — 거래 5~17회 |
+
+**실시간 스위칭 검증 (챔피언 대비)**
+
+| 구성 | 수익% | MDD% | PF | 거래 |
+|---|---|---|---|---|
+| **현금 / connors_rsi2 / macd_trend_mtf (챔피언 유지)** | **68.3** | 20.3 | 1.82 | 266 |
+| 현금 / three_day_reversion / macd_trend_mtf | 66.6 | 20.3 | 1.82 | 232 |
+| 현금 / connors_rsi2 / double_seven | 34.2 | 17.4 | 1.18 | 610 |
+
+**3차 결론: 챔피언 교체 없음.** `three_day_reversion`은 근소 열세(-1.7%p)이나 PF·MDD 동일 —
+connors_rsi2의 백업으로 등재 가치는 있음.
+
+**미국 시장 전략의 한계 관측**: Minervini·Clenow는 코스피 대형주 37종목에서 신호가 거의 안 남.
+두 전략 모두 강한 모멘텀 성장주를 전제하므로, 유니버스를 중소형 성장주로 넓히거나
+임계값을 한국 시장에 맞게 재설정해야 유의미한 검증이 가능 (미완 과제).
+
 ## 조사했으나 탈락 (수치화 불가/재현 불가)
 
 | 후보 | 탈락 사유 | 출처 |

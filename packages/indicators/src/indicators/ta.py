@@ -261,6 +261,53 @@ def ichimoku(
     return tenkan_line, kijun_line, span_a, span_b_line
 
 
+def ibs(candles: list[Candle]) -> Series:
+    """Internal Bar Strength = (종가-저가)/(고가-저가). 0=저가 마감, 1=고가 마감.
+
+    출처: 단기 평균회귀 지표 (QuantifiedStrategies, Alvarez Quant Trading 등에서 문서화).
+    """
+    out: Series = []
+    for c in candles:
+        hi, lo, cl = float(c.high), float(c.low), float(c.close)
+        out.append(0.5 if hi == lo else (cl - lo) / (hi - lo))
+    return out
+
+
+def clenow_momentum(xs: list[float], period: int = 90) -> Series:
+    """연율화 지수회귀 기울기 × R² (Clenow 'Stocks on the Move').
+
+    log(가격)에 선형회귀 → 기울기를 연율화(252거래일) → R²를 곱해
+    '추세의 강도 × 일관성'을 하나의 점수로. 높을수록 강하고 매끄러운 상승.
+    """
+    import math
+
+    n = len(xs)
+    out: Series = [None] * n
+    if n < period:
+        return out
+    t = list(range(period))
+    t_mean = (period - 1) / 2
+    t_var = sum((v - t_mean) ** 2 for v in t)
+
+    for i in range(period - 1, n):
+        window = xs[i - period + 1 : i + 1]
+        if min(window) <= 0:
+            continue
+        ys = [math.log(v) for v in window]
+        y_mean = sum(ys) / period
+        cov = sum((t[j] - t_mean) * (ys[j] - y_mean) for j in range(period))
+        slope = cov / t_var if t_var else 0.0
+        # R²
+        ss_tot = sum((y - y_mean) ** 2 for y in ys)
+        ss_res = sum(
+            (ys[j] - (y_mean + slope * (t[j] - t_mean))) ** 2 for j in range(period)
+        )
+        r2 = 1 - ss_res / ss_tot if ss_tot > 0 else 0.0
+        annualized = (math.exp(slope) ** 252 - 1) * 100
+        out[i] = annualized * r2
+    return out
+
+
 def rolling_max(xs: list[float], period: int) -> Series:
     out: Series = [None] * len(xs)
     for i in range(period - 1, len(xs)):

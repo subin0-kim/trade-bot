@@ -95,3 +95,23 @@
 - apps/bot_swing 가동: 하루 1회 사이클(레짐→US필터→청산→진입→이벤트), 포지션 파일 영속화
 - 첫 사이클(2026-07-27): BULL/macd, 나스닥 -0.64% 정상, 신호 0건, 자산 100만 무변동 — 정상 동작 확인
 - 분봉 수집: 초기 백필 진행 중 (완료 후 매일 증분 ~480콜)
+
+## [2026-07-27] ingest | 60분봉 vs 일봉 비교 (17종목, 1년)
+
+- 분봉 캐시 → 60분봉 리샘플 백테스트 (scripts/backtest_60m.py)
+- 결과 분기: 평균회귀 붕괴(connors +0.30→-3.71), 추세추종 개선(macd +2.23→+5.10) → [[timeframe-comparison]]
+- 원인: 거래당 기대폭 차이. 평균회귀는 목표가 작아 비용에 잠식, 추세추종은 이익을 길게 끌어 내성
+- 공통 대가: 승률 50%→35~40%, MDD 1.5~3배
+- 스크립트 버그 교훈: 상위TF를 W→D로 바꿀 때 **필터 모듈의 tf 파라미터도 함께** 치환해야 함
+  (설정만 바꾸면 필터가 데이터를 못 찾아 전량 차단 → 거래 0건이 '결과'로 보임)
+- 한계: 1년·강세장 단일 레짐, 17종목, 장중 현실성(호가단위·단일가) 미반영
+
+## [2026-07-27] ingest | 전략 조사 3차 (문헌 5종) — 챔피언 교체 없음
+
+- 신규 등재: double_seven, ibs_reversion, three_day_reversion, minervini_breakout, clenow_momentum
+- 신규 지표: IBS(봉내 종가 위치), Clenow 모멘텀(연율 지수회귀 기울기×R²)
+- 신규 모듈: n_day_low/ibs_below/consecutive_down 진입, n_day_high/ibs_above 청산, minervini/clenow 필터
+- 게이트: ibs_reversion·double_seven 탈락(과다거래 비용잠식), three_day_reversion 보류(스위칭 66.6 vs 챔피언 68.3)
+- **미국 시장 전략의 이식 한계 관측**: Minervini(7조건)·Clenow(회귀 모멘텀)는 코스피 대형주에서
+  신호가 거의 발생하지 않음(거래 5~81회) → 유니버스 확대 또는 한국 시장 맞춤 임계값이 선결 과제
+- 누적 통계: 후보 23개 등재 → 게이트 통과 3개 (문헌 2 + 시드 1), 유튜브발 0개 → [[strategy-candidates]]

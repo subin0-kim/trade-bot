@@ -2,9 +2,11 @@ from .ta import (
     adx,
     atr,
     bollinger,
+    clenow_momentum,
     closes,
     ema,
     highs,
+    ibs,
     ichimoku,
     lows,
     macd,
@@ -18,7 +20,7 @@ from .ta import (
 )
 
 __all__ = [
-    "adx", "atr", "bollinger", "closes", "ema", "highs", "ichimoku",
-    "lows", "macd", "roc", "rolling_max", "rolling_min", "rsi", "sma",
-    "stochastic", "volumes",
+    "adx", "atr", "bollinger", "clenow_momentum", "closes", "ema", "highs",
+    "ibs", "ichimoku", "lows", "macd", "roc", "rolling_max", "rolling_min",
+    "rsi", "sma", "stochastic", "volumes",
 ]

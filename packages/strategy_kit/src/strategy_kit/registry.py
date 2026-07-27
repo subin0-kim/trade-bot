@@ -36,6 +36,9 @@ ENTRY_TYPES = {
     "rsi_signal_cross": entry_mod.RSISignalCrossEntry,
     "ichimoku_bounce": entry_mod.IchimokuCloudBounceEntry,
     "box_breakout": entry_mod.BoxBreakoutEntry,
+    "n_day_low": entry_mod.NDayLowEntry,
+    "ibs_below": entry_mod.IBSEntry,
+    "consecutive_down": entry_mod.ConsecutiveDownEntry,
 }
 
 FILTER_TYPES = {
@@ -45,6 +48,8 @@ FILTER_TYPES = {
     "price_above_ma": filter_mod.PriceAboveMAFilter,
     "roc": filter_mod.ROCFilter,
     "ma_compare": filter_mod.MACompareFilter,
+    "minervini": filter_mod.MinerviniTrendFilter,
+    "clenow": filter_mod.ClenowMomentumFilter,
 }
 
 EXIT_TYPES = {
@@ -60,6 +65,8 @@ EXIT_TYPES = {
     "rsi_level_exit": exit_mod.RSILevelExit,
     "rsi_above_exit": exit_mod.RSIAboveExit,
     "ichimoku_exit": exit_mod.IchimokuCloudExit,
+    "n_day_high_exit": exit_mod.NDayHighExit,
+    "ibs_above_exit": exit_mod.IBSExit,
 }
 
 SIZER_TYPES = {
@@ -322,6 +329,72 @@ PRESETS: dict[str, dict] = {
         "primary_tf": "D", "higher_tfs": [],
         "tags": ["trend_follow", "breakout"],
         "source": "유튜브 2fndu2K7Tv0의 '시간차 돌파' — 60일선>120일선 골든크로스 + 전고점(60봉) 돌파 + 거래량 동반. 영상이 '세 방식 중 신뢰도 최고'라 주장한 유일한 기계화 가능형",
+    },
+    # ------------------------------------------------------------------
+    # 문헌 조사 2차 (2026-07-27) — 기존 풀에 없는 유형 위주
+    # ------------------------------------------------------------------
+    "double_seven": {
+        "entry": {"type": "n_day_low", "lookback": 7},
+        "filters": [{"type": "price_above_ma", "period": 200}],
+        "exits": [
+            {"type": "fixed_stop_take", "stop_pct": 8.0, "take_pct": 99.0},
+            {"type": "n_day_high_exit", "lookback": 7},
+            {"type": "time_stop", "max_bars": 20},
+        ],
+        "sizer": {"type": "fixed_fraction", "fraction": 0.2},
+        "primary_tf": "D", "higher_tfs": [],
+        "tags": ["mean_reversion"],
+        "source": "Connors & Alvarez 'Double Seven' — 200일선 위 + 7일 최저 종가 매수 / 7일 최고 종가 매도 (원전은 무손절, 여기선 8% 안전벨트 추가)",
+    },
+    "ibs_reversion": {
+        "entry": {"type": "ibs_below", "threshold": 0.2},
+        "filters": [{"type": "price_above_ma", "period": 200}],
+        "exits": [
+            {"type": "fixed_stop_take", "stop_pct": 6.0, "take_pct": 99.0},
+            {"type": "ibs_above_exit", "threshold": 0.8},
+            {"type": "time_stop", "max_bars": 5},
+        ],
+        "sizer": {"type": "fixed_fraction", "fraction": 0.2},
+        "primary_tf": "D", "higher_tfs": [],
+        "tags": ["mean_reversion", "short_term"],
+        "source": "Internal Bar Strength 평균회귀 (QuantifiedStrategies / Alvarez Quant Trading 문서화) — IBS<0.2 매수, IBS>0.8 청산",
+    },
+    "three_day_reversion": {
+        "entry": {"type": "consecutive_down", "days": 3},
+        "filters": [{"type": "price_above_ma", "period": 200}],
+        "exits": [
+            {"type": "fixed_stop_take", "stop_pct": 6.0, "take_pct": 99.0},
+            {"type": "above_ma_exit", "period": 5},
+            {"type": "time_stop", "max_bars": 10},
+        ],
+        "sizer": {"type": "fixed_fraction", "fraction": 0.2},
+        "primary_tf": "D", "higher_tfs": [],
+        "tags": ["mean_reversion"],
+        "source": "Connors & Alvarez 'High Probability ETF Trading' (2009) 3-Day 평균회귀 — 3일 연속 고점·저점 하락 + 200일선 위 매수",
+    },
+    "minervini_breakout": {
+        "entry": {"type": "breakout", "lookback": 50},
+        "filters": [{"type": "minervini"}],
+        "exits": [
+            {"type": "fixed_stop_take", "stop_pct": 8.0, "take_pct": 99.0},
+            {"type": "atr_trailing", "period": 14, "mult": 3.0},
+        ],
+        "sizer": {"type": "atr_risk", "risk_pct": 1.0},
+        "primary_tf": "D", "higher_tfs": [],
+        "tags": ["trend_follow", "breakout"],
+        "source": "Mark Minervini 'Trade Like a Stock Market Wizard' (2013) 트렌드 템플릿(7조건, IBD RS 제외) + 50일 신고가 돌파 진입",
+    },
+    "clenow_momentum": {
+        "entry": {"type": "ma_cross", "fast": 20, "slow": 50},
+        "filters": [{"type": "clenow", "period": 90, "min_score": 40}],
+        "exits": [
+            {"type": "fixed_stop_take", "stop_pct": 8.0, "take_pct": 99.0},
+            {"type": "atr_trailing", "period": 14, "mult": 3.5},
+        ],
+        "sizer": {"type": "atr_risk", "risk_pct": 1.0},
+        "primary_tf": "D", "higher_tfs": [],
+        "tags": ["momentum", "trend_follow"],
+        "source": "Andreas Clenow 'Stocks on the Move' (2015) — 연율 지수회귀 기울기×R² 모멘텀 + 100일선/갭 제외 조건. 원전은 유니버스 순위 선별, 여기선 절대 임계값으로 근사",
     },
 }
 

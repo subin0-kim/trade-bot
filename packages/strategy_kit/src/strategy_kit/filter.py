@@ -118,6 +118,91 @@ class MACompareFilter:
         return False, f"역배열 (MA{self.fast} ≤ MA{self.slow})"
 
 
+class MinerviniTrendFilter:
+    """Minervini 트렌드 템플릿 — Stage 2 상승 추세 판정 (7개 조건 동시 충족).
+
+    출처: Mark Minervini, 'Trade Like a Stock Market Wizard' (2013).
+    원전 8개 조건 중 8번(IBD RS 랭킹 ≥70)은 외부 데이터가 필요해 제외 — 7개만 검증한다.
+      1) 종가 > MA150, MA200   2) MA150 > MA200   3) MA200이 최근 1개월 상승
+      4) MA50 > MA150, MA200   5) 종가 > MA50
+      6) 종가 ≥ 52주 최저 × 1.25   7) 종가 ≥ 52주 최고 × 0.75
+    """
+
+    def __init__(self, low_margin: float = 1.25, high_margin: float = 0.75):
+        self.name = f"minervini(low×{low_margin},high×{high_margin})"
+        self.low_margin = low_margin
+        self.high_margin = high_margin
+
+    def allow(self, view: MarketView, event: EntryEvent) -> tuple[bool, str]:
+        candles = view.primary
+        xs = closes(candles)
+        if len(xs) < 252:
+            return False, "52주 데이터 부족"
+        ma50, ma150, ma200 = sma(xs, 50), sma(xs, 150), sma(xs, 200)
+        if ma200[-1] is None or ma150[-1] is None or ma50[-1] is None:
+            return False, "MA200 워밍업 부족"
+        if ma200[-22] is None:
+            return False, "MA200 추세 판정 데이터 부족"
+
+        close = xs[-1]
+        w52 = xs[-252:]
+        low52, high52 = min(w52), max(w52)
+        checks = [
+            (close > ma150[-1] and close > ma200[-1], "종가>MA150,200"),
+            (ma150[-1] > ma200[-1], "MA150>MA200"),
+            (ma200[-1] > ma200[-22], "MA200 1개월 상승"),
+            (ma50[-1] > ma150[-1] and ma50[-1] > ma200[-1], "MA50>MA150,200"),
+            (close > ma50[-1], "종가>MA50"),
+            (close >= low52 * self.low_margin, f"52주저점 대비 +{(close/low52-1)*100:.0f}%"),
+            (close >= high52 * self.high_margin, f"52주고점 대비 {(close/high52-1)*100:.0f}%"),
+        ]
+        failed = [label for ok, label in checks if not ok]
+        if failed:
+            return False, f"트렌드템플릿 미충족: {failed[0]}"
+        return True, "트렌드템플릿 7조건 충족"
+
+
+class ClenowMomentumFilter:
+    """Clenow 모멘텀 점수(연율 지수회귀 기울기 × R²)가 임계 이상일 때만 허용.
+
+    출처: Andreas Clenow, 'Stocks on the Move' (2015).
+    원전은 유니버스 순위 기반 선별이나, 종목별 엔진에 맞춰 절대 임계값으로 근사.
+    원전의 보조 조건(100일선 위, 최근 15% 이상 갭 제외)도 포함.
+    """
+
+    def __init__(self, period: int = 90, min_score: float = 40.0,
+                 ma_period: int = 100, max_gap_pct: float = 15.0):
+        self.name = f"clenow({period},≥{min_score})"
+        self.period = period
+        self.min_score = min_score
+        self.ma_period = ma_period
+        self.max_gap_pct = max_gap_pct
+
+    def allow(self, view: MarketView, event: EntryEvent) -> tuple[bool, str]:
+        from indicators import clenow_momentum
+
+        candles = view.primary
+        xs = closes(candles)
+        scores = clenow_momentum(xs, self.period)
+        if not scores or scores[-1] is None:
+            return False, f"Clenow({self.period}) 워밍업 부족"
+        if scores[-1] < self.min_score:
+            return False, f"모멘텀 점수 {scores[-1]:.0f} < {self.min_score}"
+
+        ma = sma(xs, self.ma_period)
+        if ma[-1] is None or xs[-1] < ma[-1]:
+            return False, f"MA{self.ma_period} 아래 (원전 제외 조건)"
+
+        # 최근 90일 내 15% 초과 갭 제외
+        for i in range(max(1, len(candles) - self.period), len(candles)):
+            prev_close = float(candles[i - 1].close)
+            if prev_close > 0:
+                gap = abs(float(candles[i].open) / prev_close - 1) * 100
+                if gap > self.max_gap_pct:
+                    return False, f"최근 {gap:.0f}% 갭 발생 (원전 제외 조건)"
+        return True, f"Clenow 모멘텀 {scores[-1]:.0f} 통과"
+
+
 class PriceAboveMAFilter:
     """기준 TF 자체의 장기 추세 필터 — 종가 > MA(period)."""
 

@@ -18,6 +18,7 @@
 - [[strategy-candidates]] — 2026-07 1차 조사: 문헌 4종 + 유튜브 5종 수치화 + 게이트 판정 (2026-07-27)
 - [[connors-rsi2]] — ✅ 게이트 통과, SIDEWAYS 슬롯. Connors & Alvarez (2008) (2026-07-27)
 - [[turtle-20-10]] — ✅ 게이트 통과, BULL 백업. 터틀 System 1 (2026-07-27)
+- [[timeframe-comparison]] — 60분봉 vs 일봉: 평균회귀는 붕괴, 추세추종은 개선 (2026-07-27)
 
 ## incidents
 

@@ -288,7 +288,15 @@ def render_page(bots: list[BotMetrics]) -> str:
 
     sections = []
     for bot in bots:
-        tiles = f"""
+        # 가동 초기: 데이터가 쌓이기 전이라는 것을 명시 (빈 차트를 고장으로 오인하지 않게)
+        if len(bot.equity_curve) < 2:
+            days = len(bot.equity_curve)
+            notice = (f'<div class="card" style="border-style:dashed"><b>가동 초기</b><br>'
+                      f'<span class="sub">사이클 {days}회 기록됨. 거래가 발생하고 자산 스냅샷이 '
+                      f'2일 이상 쌓이면 곡선·기간별 수익률이 표시됩니다.</span></div>')
+        else:
+            notice = ""
+        tiles = notice + f"""
 <div class="tiles">
   <div class="tile"><div class="label">총 수익률</div>
     <div class="value">{fmt_pct(bot.total_return_pct)}</div>

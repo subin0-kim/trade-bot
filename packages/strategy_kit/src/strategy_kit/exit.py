@@ -230,6 +230,40 @@ class IchimokuCloudExit:
         return None
 
 
+class NDayHighExit:
+    """종가가 N일 최고치이면 청산 (Connors 'Double Seven'의 청산)."""
+
+    def __init__(self, lookback: int = 7):
+        self.name = f"n_day_high_exit({lookback})"
+        self.lookback = lookback
+
+    def check(self, view: MarketView, position: OpenPosition) -> ExitEvent | None:
+        xs = closes(view.primary)
+        if len(xs) < self.lookback:
+            return None
+        if xs[-1] >= max(xs[-self.lookback :]):
+            return ExitEvent(f"{self.lookback}일 최고 종가 {xs[-1]:.0f}")
+        return None
+
+
+class IBSExit:
+    """IBS가 임계 초과이면 청산 — 고가 부근 마감 = 단기 과열."""
+
+    def __init__(self, threshold: float = 0.8):
+        self.name = f"ibs_above_exit({threshold})"
+        self.threshold = threshold
+
+    def check(self, view: MarketView, position: OpenPosition) -> ExitEvent | None:
+        from indicators import ibs
+
+        vals = ibs(view.primary)
+        if not vals:
+            return None
+        if vals[-1] > self.threshold:
+            return ExitEvent(f"IBS {vals[-1]:.2f} > {self.threshold} (고가권 마감)")
+        return None
+
+
 class BollingerMidExit:
     """볼린저 중심선 복귀 청산 — 평균회귀 진입의 짝 (목표 = 평균)."""
 

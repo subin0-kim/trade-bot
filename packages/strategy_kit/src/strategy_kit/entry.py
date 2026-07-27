@@ -321,6 +321,76 @@ class BoxBreakoutEntry:
         return None
 
 
+class NDayLowEntry:
+    """종가가 N일 최저치이면 진입 (Connors 'Double Seven'의 진입).
+
+    출처: Connors & Alvarez, 'Short Term Trading Strategies That Work' —
+    200일선 위 + 7일 최저 종가 매수 / 7일 최고 종가 매도. 200일선 필터는 별도 모듈.
+    """
+
+    def __init__(self, lookback: int = 7):
+        self.name = f"n_day_low({lookback})"
+        self.lookback = lookback
+
+    def check(self, view: MarketView) -> EntryEvent | None:
+        xs = closes(view.primary)
+        if len(xs) < self.lookback:
+            return None
+        window = xs[-self.lookback :]
+        if xs[-1] <= min(window):
+            return EntryEvent(
+                OrderSide.BUY, 0.7,
+                f"{self.lookback}일 최저 종가 {xs[-1]:.0f}",
+            )
+        return None
+
+
+class IBSEntry:
+    """IBS(종가의 봉내 위치)가 임계 미만이면 진입 — 저가 부근 마감 = 단기 과매도.
+
+    출처: Internal Bar Strength 평균회귀 (QuantifiedStrategies / Alvarez Quant Trading).
+    """
+
+    def __init__(self, threshold: float = 0.2):
+        self.name = f"ibs_below({threshold})"
+        self.threshold = threshold
+
+    def check(self, view: MarketView) -> EntryEvent | None:
+        from indicators import ibs
+
+        vals = ibs(view.primary)
+        if not vals:
+            return None
+        if vals[-1] < self.threshold:
+            return EntryEvent(
+                OrderSide.BUY, 0.7, f"IBS {vals[-1]:.2f} < {self.threshold} (저가권 마감)"
+            )
+        return None
+
+
+class ConsecutiveDownEntry:
+    """N일 연속 저점·고점 하락(lower lows & lower highs) 후 진입.
+
+    출처: Connors & Alvarez, 'High Probability ETF Trading' (2009) 3-Day 평균회귀.
+    """
+
+    def __init__(self, days: int = 3):
+        self.name = f"consecutive_down({days})"
+        self.days = days
+
+    def check(self, view: MarketView) -> EntryEvent | None:
+        candles = view.primary
+        if len(candles) < self.days + 1:
+            return None
+        for i in range(self.days):
+            cur, prev = candles[-1 - i], candles[-2 - i]
+            if not (cur.high < prev.high and cur.low < prev.low):
+                return None
+        return EntryEvent(
+            OrderSide.BUY, 0.7, f"{self.days}일 연속 고점·저점 하락 후 진입"
+        )
+
+
 class VolumeSpikeReversalEntry:
     """거래량 급증 + 양봉 반전 진입 — 거래량이 평균의 배수 이상 + 종가>시가."""
 
