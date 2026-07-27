@@ -16,10 +16,21 @@ from __future__ import annotations
 import hashlib
 import time
 import uuid
+import warnings
 from urllib.parse import urlencode
 
 import jwt
 import requests
+
+# 업비트 secret_key는 40바이트라 PyJWT가 SHA512 권장 길이(64B) 미달 경고를 낸다.
+# 업비트 사양상 정상이므로 소음만 제거한다.
+warnings.filterwarnings("ignore", message=".*HMAC key.*", module="jwt.*")
+try:
+    from jwt.warnings import InsecureKeyLengthWarning
+
+    warnings.simplefilter("ignore", InsecureKeyLengthWarning)
+except ImportError:
+    pass
 
 from .config import UpbitSettings
 

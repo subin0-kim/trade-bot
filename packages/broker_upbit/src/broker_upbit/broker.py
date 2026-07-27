@@ -158,21 +158,29 @@ class UpbitBroker:
         accounts = [a for a in self._accounts() if a["currency"] != "KRW"]
         if not accounts:
             return []
-        markets = [f"KRW-{a['currency']}" for a in accounts]
-        tickers = {t["market"]: Decimal(str(t["trade_price"]))
-                   for t in self.client.get("/v1/ticker", {"markets": ",".join(markets)})}
+        # KRW 마켓이 없는 보유 자산(상장폐지·BTC마켓 전용 코인 등)이 섞이면
+        # /v1/ticker가 404를 던지므로, 유효한 마켓만 조회한다.
+        valid = set(self.list_krw_markets())
+        markets = [m for m in (f"KRW-{a['currency']}" for a in accounts) if m in valid]
+        tickers = (
+            {t["market"]: Decimal(str(t["trade_price"]))
+             for t in self.client.get("/v1/ticker", {"markets": ",".join(markets)})}
+            if markets else {}
+        )
         positions = []
         for a in accounts:
             qty = Decimal(a["balance"]) + Decimal(a["locked"])
             if qty <= 0:
                 continue
             market = f"KRW-{a['currency']}"
+            avg = Decimal(a.get("avg_buy_price") or 0)
             positions.append(Position(
                 symbol=market,
                 name=a["currency"],
                 quantity=qty,
-                avg_price=Decimal(a.get("avg_buy_price") or 0),
-                current_price=tickers.get(market, Decimal(0)),
+                avg_price=avg,
+                # 시세 조회 불가 자산은 평단으로 대체 (평가액 0원 표기 방지)
+                current_price=tickers.get(market, avg),
             ))
         return positions
 

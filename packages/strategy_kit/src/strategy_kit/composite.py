@@ -86,7 +86,9 @@ class CompositeStrategy:
                 return Decision.hold(*reasons)
 
         quantity = self.sizer.size(view, event, equity)
-        if quantity < 1:
+        # 최소 단위는 시장별로 다르다 (주식 1주 / 코인 1e-8) — 0 이하만 거른다.
+        # 단위 정렬·최소주문금액 검사는 사이저가 이미 수행한다.
+        if quantity <= 0:
             return Decision.hold(*reasons, "사이징 결과 수량 0")
 
         return Decision(

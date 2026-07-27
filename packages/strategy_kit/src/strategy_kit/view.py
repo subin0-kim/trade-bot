@@ -19,6 +19,10 @@ class MarketView:
     symbol: str
     primary_tf: str                       # 전략의 기준 타임프레임 (예: "D", "5m")
     candles: dict[str, list[Candle]]      # tf → 완성봉 리스트 (오름차순)
+    # 시장별 수량 단위 (주식=1주, 코인=1e-8). 사이저가 이 단위로 내림 정렬한다.
+    # 이 값이 없으면 코인에서 "BTC 1개=9천만원 → 수량 0"으로 잘려 거래가 성립하지 않는다.
+    quantity_step: Decimal = Decimal(1)
+    min_order_value: Decimal = Decimal(0)  # 최소 주문 금액 (업비트 5,000원)
 
     @property
     def primary(self) -> list[Candle]:

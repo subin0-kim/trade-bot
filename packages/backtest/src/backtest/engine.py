@@ -99,6 +99,8 @@ class Backtester:
         slippage_rate: Decimal = Decimal("0.0005"),
         warmup: int = 130,
         view_window: int = 320,  # 최장 룩백 모듈(52주 돌파=250봉)+워밍업 여유
+        quantity_step: Decimal = Decimal(1),   # 주식 1주 / 코인 1e-8
+        min_order_value: Decimal = Decimal(0),
     ):
         self.strategy = strategy
         self.primary_tf = primary_tf
@@ -111,6 +113,8 @@ class Backtester:
         # 전략에 노출할 최근 봉 개수 — 지표 재계산이 O(전체길이)가 되는 것을 방지.
         # 최장 워밍업 모듈(price_above_ma 120)보다 충분히 크게 유지할 것.
         self.view_window = view_window
+        self.quantity_step = quantity_step
+        self.min_order_value = min_order_value
 
     def run(self, symbol: str, candles: list[Candle]) -> BacktestResult:
         if len(candles) <= self.warmup + 1:
@@ -196,6 +200,8 @@ class Backtester:
                         for tf, (bars, counts) in higher.items()
                     },
                 },
+                quantity_step=self.quantity_step,
+                min_order_value=self.min_order_value,
             )
             equity = cash + (
                 position.quantity * bar.close if position else Decimal(0)

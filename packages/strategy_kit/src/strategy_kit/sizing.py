@@ -2,15 +2,29 @@
 
 모든 사이저는 size(view, event, equity) -> Decimal(수량) 을 구현한다.
 정책(aggressiveness)에 의한 축소는 봇 런타임이 곱한다 — 여기서는 순수 계산만.
+
+수량은 반드시 `view.quantity_step` 단위로 내림 정렬한다.
+(주식 1주 / 코인 1e-8 — 정수로 자르면 고가 코인에서 수량이 0이 된다)
 """
 
 from __future__ import annotations
 
-from decimal import Decimal
+from decimal import ROUND_DOWN, Decimal
 
 from indicators import atr
 
 from .view import EntryEvent, MarketView
+
+
+def _align(quantity: Decimal, view: MarketView) -> Decimal:
+    """수량 단위로 내림 정렬 + 최소 주문 금액 미달 시 0."""
+    step = view.quantity_step or Decimal(1)
+    aligned = (quantity / step).to_integral_value(rounding=ROUND_DOWN) * step
+    if aligned <= 0:
+        return Decimal(0)
+    if view.min_order_value and aligned * view.close < view.min_order_value:
+        return Decimal(0)
+    return aligned
 
 
 class FixedFractionSizer:
@@ -22,7 +36,7 @@ class FixedFractionSizer:
 
     def size(self, view: MarketView, event: EntryEvent, equity: Decimal) -> Decimal:
         budget = equity * self.fraction
-        return Decimal(int(budget / view.close))
+        return _align(budget / view.close, view)
 
 
 class ATRRiskSizer:
@@ -42,8 +56,9 @@ class ATRRiskSizer:
         a = atr(view.primary, self.atr_period)
         if not a or a[-1] is None or a[-1] <= 0:
             return Decimal(0)
-        risk_amount = float(equity) * self.risk_pct / 100.0
-        qty = int(risk_amount / (a[-1] * self.stop_mult))
+        risk_amount = equity * Decimal(str(self.risk_pct)) / Decimal(100)
+        stop_distance = Decimal(str(a[-1])) * Decimal(str(self.stop_mult))
+        qty = risk_amount / stop_distance
         # 예산 한도: 계좌의 30%를 넘지 않게 안전벨트
-        max_qty = int(equity * Decimal("0.3") / view.close)
-        return Decimal(min(qty, max_qty))
+        max_qty = equity * Decimal("0.3") / view.close
+        return _align(min(qty, max_qty), view)
