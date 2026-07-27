@@ -109,7 +109,48 @@ def evaluate_agreement(series: dict[date, Regime]) -> None:
         print(f"{label:<16}{row[0]:>8}{row[1]:>8}{row[2]:>10}")
 
 
-def run_live_switch(series: dict[date, Regime]) -> None:
+def build_us_blocked_dates(mode: str) -> set[date]:
+    """미국장 쇼크일 계산: 한국 거래일 기준 '개장 전 확정된 나스닥 야간 수익률'이 극단인 날.
+
+    mode: "down" = ≤-2%만 차단, "both" = |수익률|≥2% 차단
+    """
+    import bisect
+
+    from us_lead_analysis import build_us_overnight_returns, fetch_us_index
+
+    us = fetch_us_index("COMP")
+    us_returns = build_us_overnight_returns(us)
+    us_dates = sorted(us_returns)
+
+    blocked: set[date] = set()
+    # 한국 거래일 후보 = 캐시된 KOSPI 일자
+    for kr_candle in load_kospi_dates():
+        idx = bisect.bisect_left(us_dates, kr_candle) - 1
+        if idx < 0:
+            continue
+        ret = us_returns[us_dates[idx]]
+        if ret <= -2.0 or (mode == "both" and ret >= 2.0):
+            blocked.add(kr_candle)
+    return blocked
+
+
+def load_kospi_dates() -> list[date]:
+    import json as json_mod
+
+    dates = []
+    for line in INDEX_CACHE.read_text(encoding="utf-8").splitlines():
+        d = json_mod.loads(line)
+        dates.append(datetime.fromisoformat(d["ts"]).date())
+    return dates
+
+
+def run_live_switch(
+    series: dict[date, Regime],
+    us_filter: str | None = None,
+    cash: int = 50_000_000,
+    max_positions: int = 8,
+    small_account: bool = False,
+) -> None:
     data = {}
     for symbol in UNIVERSE:
         try:
@@ -123,6 +164,14 @@ def run_live_switch(series: dict[date, Regime]) -> None:
         regime: (build_preset(preset) if preset else None)
         for regime, preset in REGIME_MAPPING.items()
     }
+    if small_account:
+        # 소액 계좌: ATR 리스크 사이징은 수량 0이 다발 → 슬롯 예산을 그대로 쓰는
+        # 고정비율 사이저로 교체 (포트폴리오 레벨의 슬롯 상한이 분산을 담당)
+        from strategy_kit.sizing import FixedFractionSizer
+
+        for strategy in mapping.values():
+            if strategy is not None:
+                strategy.sizer = FixedFractionSizer(fraction=0.9 / max_positions)
     higher_tfs: set[str] = set()
     for preset in REGIME_MAPPING.values():
         if preset:
@@ -133,11 +182,22 @@ def run_live_switch(series: dict[date, Regime]) -> None:
         {d: r.value for d, r in series.items()},
         mapping,
     )
+    if us_filter:
+        from strategy_kit import EntryBlockedDatesStrategy
+
+        blocked = build_us_blocked_dates(us_filter)
+        print(f"US 쇼크일 필터({us_filter}): {len(blocked)}일 진입 차단")
+        strategy = EntryBlockedDatesStrategy(
+            f"regime_switch+us_{us_filter}", strategy, blocked, reason=f"US쇼크({us_filter})"
+        )
+    from decimal import Decimal
+
     pbt = PortfolioBacktester(
-        strategy, higher_tfs=sorted(higher_tfs), max_positions=8, warmup=WARMUP,
+        strategy, higher_tfs=sorted(higher_tfs),
+        initial_cash=Decimal(cash), max_positions=max_positions, warmup=WARMUP,
     )
     s = pbt.run(data).summary()
-    print("\n실시간 레짐 스위칭 포트폴리오 백테스트:")
+    print(f"\n실시간 레짐 스위칭 포트폴리오 백테스트 (자본 {cash:,}원, 최대 {max_positions}종목):")
     print(f"  수익 {s['total_return_pct']}% | MDD {s['max_drawdown_pct']}% | "
           f"거래 {s['trades']} | 승률 {s['win_rate']}% | PF {s['profit_factor']} | 노출 {s['exposure_pct']}%")
     print(f"  (비교) 사후 라벨 상한선: +82.5% / MDD 16.2% | 벤치 B&H: {s['bench_return_pct']}% / MDD {s['bench_mdd_pct']}%")
@@ -151,6 +211,12 @@ def main():
     parser.add_argument("--bull", default=None, help="상승 레짐 전략 프리셋")
     parser.add_argument("--sideways", default=None, help="횡보 레짐 전략 프리셋")
     parser.add_argument("--bear", default=None, help="하락 레짐 전략 프리셋 (기본 현금)")
+    parser.add_argument("--us-filter", choices=["down", "both"], default=None,
+                        help="미국장 쇼크일 진입 차단 (down: ≤-2%%, both: |수익률|≥2%%)")
+    parser.add_argument("--cash", type=int, default=50_000_000, help="초기 자본(원)")
+    parser.add_argument("--max-positions", type=int, default=8)
+    parser.add_argument("--small-account", action="store_true",
+                        help="소액 계좌 사이징: 슬롯 예산 고정비율 사용 (ATR 사이저 대체)")
     args = parser.parse_args()
 
     if args.bull:
@@ -171,7 +237,9 @@ def main():
     print_transitions(series)
     evaluate_agreement(series)
     if not args.no_backtest:
-        run_live_switch(series)
+        run_live_switch(series, us_filter=args.us_filter,
+                        cash=args.cash, max_positions=args.max_positions,
+                        small_account=args.small_account)
 
 
 if __name__ == "__main__":

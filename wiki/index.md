@@ -26,3 +26,4 @@
 ## shared/market-regimes
 
 - [[regime-strategy-observations]] — 레짐 × 전략 1차 관측: 하락=방어, 횡보=평균회귀, 상승=모멘텀+노출 (2026-07-26)
+- [[us-lead-effect]] — 미국장 선행 효과: 갭 상관 0.53이나 장중 0 → 알파 기각, 쇼크일 방어 필터로 전환 (2026-07-27)

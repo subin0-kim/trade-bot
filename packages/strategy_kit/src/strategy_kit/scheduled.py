@@ -16,6 +16,28 @@ from .composite import CompositeStrategy
 from .view import Decision, MarketView, OpenPosition
 
 
+class EntryBlockedDatesStrategy:
+    """특정 일자 집합에서 '신규 진입만' 차단하는 래퍼 (청산은 그대로 위임).
+
+    용도: 미국장 쇼크일(야간 |수익률| 극단) 등 외부 신호 기반 거래 차단 —
+    Commander가 정책의 trading_enabled로 하는 일의 백테스트 대응물.
+    """
+
+    def __init__(self, name: str, inner, blocked_dates: set[date], reason: str = "차단일"):
+        self.name = name
+        self.inner = inner
+        self.blocked_dates = blocked_dates
+        self.reason = reason
+
+    def evaluate(
+        self, view: MarketView, position: OpenPosition | None, equity: Decimal
+    ) -> Decision:
+        decision = self.inner.evaluate(view, position, equity)
+        if decision.action == "enter" and view.now.date() in self.blocked_dates:
+            return Decision.hold(f"[{self.reason}] 신규 진입 차단", *decision.reasons)
+        return decision
+
+
 class RegimeMappedStrategy:
     """일자별 레짐 시리즈 + (레짐 → 전략) 매핑으로 스위칭하는 메타 전략.
 

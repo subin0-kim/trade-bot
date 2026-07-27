@@ -1,0 +1,26 @@
+[project]
+name = "bot-swing"
+version = "0.1.0"
+description = "스윙봇 — 일봉 레짐 스위칭 (검증 구성: 현금/connors/macd + US 쇼크필터)"
+requires-python = ">=3.11"
+dependencies = [
+    "trading-core",
+    "broker-kis",
+    "strategy-kit",
+    "trading-regime",
+    "trading-backtest",
+]
+
+[project.scripts]
+bot-swing = "bot_swing.main:main"
+
+[tool.uv.sources]
+trading-core = { workspace = true }
+broker-kis = { workspace = true }
+strategy-kit = { workspace = true }
+trading-regime = { workspace = true }
+trading-backtest = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

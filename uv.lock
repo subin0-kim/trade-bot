@@ -5,11 +5,13 @@ requires-python = ">=3.11"
 [manifest]
 members = [
     "bot-scalper",
+    "bot-swing",
     "broker-kis",
     "stock-trade-bot",
     "strategy-kit",
     "trading-backtest",
     "trading-core",
+    "trading-dashboard",
     "trading-indicators",
     "trading-regime",
 ]
@@ -27,6 +29,27 @@ dependencies = [
 requires-dist = [
     { name = "broker-kis", editable = "packages/broker_kis" },
     { name = "trading-core", editable = "packages/core" },
+]
+
+[[package]]
+name = "bot-swing"
+version = "0.1.0"
+source = { editable = "apps/bot_swing" }
+dependencies = [
+    { name = "broker-kis" },
+    { name = "strategy-kit" },
+    { name = "trading-backtest" },
+    { name = "trading-core" },
+    { name = "trading-regime" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "broker-kis", editable = "packages/broker_kis" },
+    { name = "strategy-kit", editable = "packages/strategy_kit" },
+    { name = "trading-backtest", editable = "packages/backtest" },
+    { name = "trading-core", editable = "packages/core" },
+    { name = "trading-regime", editable = "packages/regime" },
 ]
 
 [[package]]
@@ -214,8 +237,10 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "bot-scalper" },
+    { name = "bot-swing" },
     { name = "strategy-kit" },
     { name = "trading-backtest" },
+    { name = "trading-dashboard" },
     { name = "trading-indicators" },
     { name = "trading-regime" },
 ]
@@ -223,8 +248,10 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "bot-scalper", editable = "apps/bot_scalper" },
+    { name = "bot-swing", editable = "apps/bot_swing" },
     { name = "strategy-kit", editable = "packages/strategy_kit" },
     { name = "trading-backtest", editable = "packages/backtest" },
+    { name = "trading-dashboard", editable = "apps/dashboard" },
     { name = "trading-indicators", editable = "packages/indicators" },
     { name = "trading-regime", editable = "packages/regime" },
 ]
@@ -265,6 +292,11 @@ requires-dist = [
 name = "trading-core"
 version = "0.1.0"
 source = { editable = "packages/core" }
+
+[[package]]
+name = "trading-dashboard"
+version = "0.1.0"
+source = { editable = "apps/dashboard" }
 
 [[package]]
 name = "trading-indicators"

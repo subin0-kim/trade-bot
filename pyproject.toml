@@ -5,10 +5,12 @@ description = "멀티 봇 자동매매 모노레포 (KIS / Upbit)"
 requires-python = ">=3.11"
 dependencies = [
     "bot-scalper",
+    "bot-swing",
     "trading-indicators",
     "strategy-kit",
     "trading-backtest",
     "trading-regime",
+    "trading-dashboard",
 ]
 
 [tool.uv.workspace]
@@ -16,10 +18,12 @@ members = ["packages/*", "apps/*"]
 
 [tool.uv.sources]
 bot-scalper = { workspace = true }
+bot-swing = { workspace = true }
 trading-indicators = { workspace = true }
 strategy-kit = { workspace = true }
 trading-backtest = { workspace = true }
 trading-regime = { workspace = true }
+trading-dashboard = { workspace = true }
 
 [tool.uv]
 package = false

@@ -1,0 +1,16 @@
+[project]
+name = "trading-dashboard"
+version = "0.1.0"
+description = "이벤트 로그 기반 성과 대시보드 (self-contained HTML 생성)"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+dashboard-build = "dashboard.build:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dashboard"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

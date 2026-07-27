@@ -10,8 +10,10 @@
 - `packages/strategy_kit` (`strategy_kit`): 전략 모듈 분해 — Entry/Filter/Exit/Sizing 조립식. 전략 정의는 `registry.PRESETS` 설정 dict
 - `packages/backtest` (`backtest`): 백테스트 엔진 3종 — 단일종목/포트폴리오/레짐스위칭 (MTF 완성봉만 노출, 다음 봉 시가 체결, 비용 모델)
 - `packages/regime` (`regime`): 시장 레짐 판별 (KOSPI 지수 → bull/bear/sideways, 히스테리시스)
-- `apps/bot_scalper`: 단타봇 (분봉 기반)
-- 예정: `apps/bot_swing` (1~2주 스윙), `apps/commander` (레짐 판별 → 우세 전략 선택 → 정책 발행), `apps/dashboard`, `packages/broker_upbit`
+- `apps/bot_swing`: **스윙봇 (운용 단계)** — 하루 1회, 검증 구성(현금/connors/macd + US필터), 상태 영속화(`data/state/`)
+- `apps/dashboard`: 이벤트 로그 → self-contained HTML 대시보드 (`uv run dashboard-build`)
+- `apps/bot_scalper`: 단타봇 (분봉 기반 — 분봉 전략 게이트 통과 후 본격 개발)
+- 예정: `apps/commander` (레짐 판별 → 정책 발행), `packages/broker_upbit`
 - `wiki/`: LLM-wiki (아래 스키마 참고)
 - `data/`: 런타임 산출물 (이벤트 JSONL, 정책 파일) — gitignore됨
 
@@ -39,7 +41,12 @@ uv run python scripts/backtest_demo.py --offline           # 합성 데이터 �
 uv run python scripts/backtest_demo.py --symbol 005930     # KIS 일봉 백테스트
 uv run python scripts/universe_backtest.py                 # 유니버스 37종목 × 3구간 (일봉 캐시 생성)
 uv run python scripts/portfolio_backtest.py                # 포트폴리오 백테스트 (캐시 필요)
+uv run bot-swing                                           # 스윙봇 1사이클 (dry-run, 하루 1회)
+uv run dashboard-build                                     # 대시보드 HTML 갱신
+uv run python scripts/collect_minutes.py                   # 분봉 아카이브 증분 수집
 ```
+
+이벤트 스키마(`data/events/*.jsonl`): `entry`/`exit`(pnl, win, reasons)/`equity`(일별) — 대시보드·wiki ingest의 원천. 스키마 정의는 `scripts/emit_backtest_events.py` docstring.
 
 KIS 인증정보는 `D:/kis/config/kis_devlp.yaml` (repo 밖, 공식 샘플과 동일 포맷. `KIS_CONFIG_PATH`로 변경 가능). 토큰 캐시는 `D:/kis/config/tokens/`.
 
