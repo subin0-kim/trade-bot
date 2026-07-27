@@ -33,6 +33,33 @@ class FixedStopTakeExit:
         return None
 
 
+class ATRStopExit:
+    """진입가 기준 ATR 고정 손절 — 터틀의 2N 손절.
+
+    출처: Richard Dennis 터틀 규칙 — 손절선 = 진입가 - 2N (N = 20일 ATR).
+    고정 %(예: -6%) 손절과 달리 종목 변동성에 비례하므로,
+    ATRRiskSizer(2N 기준 수량 산정)와 짝을 이뤄야 '거래당 리스크 1% 균등화'가 성립한다.
+    """
+
+    def __init__(self, period: int = 20, mult: float = 2.0):
+        self.name = f"atr_stop({period},{mult}N)"
+        self.period = period
+        self.mult = mult
+
+    def check(self, view: MarketView, position: OpenPosition) -> ExitEvent | None:
+        a = atr(view.primary, self.period)
+        if not a or a[-1] is None:
+            return None
+        stop_level = float(position.entry_price) - a[-1] * self.mult
+        close = float(view.close)
+        if close < stop_level:
+            return ExitEvent(
+                f"{self.mult}N 손절: 종가 {close:.0f} < 진입 {float(position.entry_price):.0f}"
+                f" - {self.mult}×ATR({a[-1]:.0f})"
+            )
+        return None
+
+
 class ATRTrailingExit:
     """ATR 트레일링 스탑 — 진입 후 최고 종가에서 ATR×mult 하락 시 청산."""
 

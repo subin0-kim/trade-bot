@@ -206,9 +206,9 @@ def main():
         slots = MAX_POSITIONS - len(state.positions)
         if slots > 0:
             meta = preset_meta(preset_name)
+            # 1단계: 전 종목 스캔해 진입 후보 수집 (아직 주문하지 않음)
+            candidates = []
             for symbol, name in UNIVERSE.items():
-                if slots <= 0:
-                    break
                 if symbol in state.positions:
                     continue
                 candles = candle_cache.get(symbol) or fetch_completed_daily(broker, symbol)
@@ -220,8 +220,14 @@ def main():
                     view_candles["W"] = resample(candles, "W")[:-1]
                 view = MarketView(symbol=symbol, primary_tf="D", candles=view_candles)
                 decision = strategy.evaluate(view, None, equity)
-                if decision.action != "enter":
-                    continue
+                if decision.action == "enter":
+                    candidates.append((decision.score, symbol, name, decision))
+
+            # 2단계: 신호 품질 순으로 슬롯만큼만 집행 (백테스터와 동일 규칙)
+            candidates.sort(key=lambda c: (-c[0], c[1]))
+            if len(candidates) > slots:
+                logger.info("진입 후보 %d개 중 상위 %d개 집행 (점수순)", len(candidates), slots)
+            for score, symbol, name, decision in candidates[:slots]:
                 price = broker.get_quote(symbol).price
                 qty = int(min(decision.quantity, Decimal(state.cash) / price))
                 if qty < 1:

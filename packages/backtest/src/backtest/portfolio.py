@@ -198,13 +198,16 @@ class PortfolioBacktester:
                     st.pending = {"action": "exit", "reason": " / ".join(decision.reasons)}
                 elif decision.action == "enter" and st.position is None:
                     candidates.append((
-                        1.0,  # 강도 정보가 Decision에 없으므로 동순위 — 추후 확장
+                        decision.score,
                         symbol,
                         {"action": "enter", "quantity": decision.quantity,
                          "reason": " / ".join(decision.reasons)},
                     ))
 
-            # --- 3) 슬롯 남는 만큼만 진입 예약 ---
+            # --- 3) 슬롯 남는 만큼만, 신호 품질 순으로 진입 예약 ---
+            # 점수 의미는 전략별로 다르나 한 시점에 한 전략만 가동되므로 비교 가능
+            # (평균회귀=과매도 깊이, 추세·돌파=모멘텀 강도). 동점은 심볼코드 순으로 결정적 처리.
+            candidates.sort(key=lambda c: (-c[0], c[1]))
             slots = self.max_positions - n_open - n_pending_enter
             for _, symbol, pending in candidates[: max(slots, 0)]:
                 states[symbol].pending = pending

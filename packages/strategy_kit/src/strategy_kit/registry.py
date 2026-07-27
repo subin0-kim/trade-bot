@@ -39,6 +39,8 @@ ENTRY_TYPES = {
     "n_day_low": entry_mod.NDayLowEntry,
     "ibs_below": entry_mod.IBSEntry,
     "consecutive_down": entry_mod.ConsecutiveDownEntry,
+    "ichimoku_tk_cross": entry_mod.IchimokuTKCrossEntry,
+    "ichimoku_kumo_breakout": entry_mod.IchimokuKumoBreakoutEntry,
 }
 
 FILTER_TYPES = {
@@ -50,11 +52,15 @@ FILTER_TYPES = {
     "ma_compare": filter_mod.MACompareFilter,
     "minervini": filter_mod.MinerviniTrendFilter,
     "clenow": filter_mod.ClenowMomentumFilter,
+    "rsi_range": filter_mod.RSIRangeFilter,
+    "above_cloud": filter_mod.AboveCloudFilter,
+    "chikou": filter_mod.ChikouFilter,
 }
 
 EXIT_TYPES = {
     "fixed_stop_take": exit_mod.FixedStopTakeExit,
     "atr_trailing": exit_mod.ATRTrailingExit,
+    "atr_stop": exit_mod.ATRStopExit,
     "time_stop": exit_mod.TimeStopExit,
     "ma_cross_exit": exit_mod.MACrossExit,
     "bollinger_mid_exit": exit_mod.BollingerMidExit,
@@ -395,6 +401,76 @@ PRESETS: dict[str, dict] = {
         "primary_tf": "D", "higher_tfs": [],
         "tags": ["momentum", "trend_follow"],
         "source": "Andreas Clenow 'Stocks on the Move' (2015) — 연율 지수회귀 기울기×R² 모멘텀 + 100일선/갭 제외 조건. 원전은 유니버스 순위 선별, 여기선 절대 임계값으로 근사",
+    },
+    # ------------------------------------------------------------------
+    # 조사 4차 (2026-07-27) — 교과서 정통 조합 (기존 검증의 공백 메우기)
+    # ------------------------------------------------------------------
+    "bb_rsi_classic": {
+        "entry": {"type": "bollinger_touch", "period": 20, "k": 2.0},
+        "filters": [{"type": "rsi_range", "period": 14, "max_rsi": 35}],
+        "exits": [
+            {"type": "fixed_stop_take", "stop_pct": 4.0, "take_pct": 99.0},
+            {"type": "bollinger_mid_exit", "period": 20},
+            {"type": "time_stop", "max_bars": 15},
+        ],
+        "sizer": {"type": "fixed_fraction", "fraction": 0.2},
+        "primary_tf": "D", "higher_tfs": [],
+        "tags": ["mean_reversion", "confirmation"],
+        "source": "볼린저+RSI 정통 조합 (교과서 표준): 하단 터치 반등 + RSI 과매도 동시 확인. 교과서는 RSI<30이나 반등 확인 시점엔 이미 RSI가 올라와 있어 35로 완화 (자체 판단, 명시)",
+    },
+    "ichimoku_tk": {
+        "entry": {"type": "ichimoku_tk_cross"},
+        "filters": [],
+        "exits": [
+            {"type": "fixed_stop_take", "stop_pct": 5.0, "take_pct": 99.0},
+            {"type": "ichimoku_exit"},
+            {"type": "time_stop", "max_bars": 40},
+        ],
+        "sizer": {"type": "fixed_fraction", "fraction": 0.2},
+        "primary_tf": "D", "higher_tfs": [],
+        "tags": ["trend_follow"],
+        "source": "一目均衡表 정통 신호 — 전환선(9)이 기준선(26) 상향 돌파 (TK 크로스)",
+    },
+    "ichimoku_kumo": {
+        "entry": {"type": "ichimoku_kumo_breakout"},
+        "filters": [],
+        "exits": [
+            {"type": "fixed_stop_take", "stop_pct": 5.0, "take_pct": 99.0},
+            {"type": "ichimoku_exit"},
+            {"type": "atr_trailing", "period": 14, "mult": 3.0},
+        ],
+        "sizer": {"type": "atr_risk", "risk_pct": 1.0},
+        "primary_tf": "D", "higher_tfs": [],
+        "tags": ["trend_follow", "breakout"],
+        "source": "一目均衡表 정통 신호 — 가격의 구름(Kumo) 상향 완전 돌파",
+    },
+    "ichimoku_sanyaku": {
+        "entry": {"type": "ichimoku_tk_cross"},
+        "filters": [
+            {"type": "above_cloud"},
+            {"type": "chikou", "lag": 26},
+        ],
+        "exits": [
+            {"type": "fixed_stop_take", "stop_pct": 5.0, "take_pct": 99.0},
+            {"type": "ichimoku_exit"},
+            {"type": "atr_trailing", "period": 14, "mult": 3.0},
+        ],
+        "sizer": {"type": "atr_risk", "risk_pct": 1.0},
+        "primary_tf": "D", "higher_tfs": [],
+        "tags": ["trend_follow", "confirmation"],
+        "source": "一目均衡表 삼역호전(三役好転) — 일목 이론 최강 매수 신호: TK크로스 + 가격이 구름 위 + 후행스팬이 26봉 전 가격 위, 3조건 동시 충족",
+    },
+    "turtle_20_10_atr": {
+        "entry": {"type": "breakout", "lookback": 20},
+        "filters": [],
+        "exits": [
+            {"type": "atr_stop", "period": 20, "mult": 2.0},   # ★ 원전의 2N 손절
+            {"type": "donchian_exit", "lookback": 10},
+        ],
+        "sizer": {"type": "atr_risk", "risk_pct": 1.0, "atr_period": 20, "stop_mult": 2.0},
+        "primary_tf": "D", "higher_tfs": [],
+        "tags": ["trend_follow", "breakout"],
+        "source": "터틀 System 1 원전 충실판 — 20일 돌파 진입 / 손절 = 진입가-2N(ATR20×2) / 10일 저점 청산 / 2N 리스크 사이징. 기존 turtle_20_10은 손절을 고정 6%로 대체한 변형(비교군)",
     },
 }
 

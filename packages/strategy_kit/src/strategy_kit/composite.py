@@ -90,5 +90,6 @@ class CompositeStrategy:
             return Decision.hold(*reasons, "사이징 결과 수량 0")
 
         return Decision(
-            action="enter", side=event.side, quantity=quantity, reasons=tuple(reasons)
+            action="enter", side=event.side, quantity=quantity,
+            reasons=tuple(reasons), score=event.score,
         )

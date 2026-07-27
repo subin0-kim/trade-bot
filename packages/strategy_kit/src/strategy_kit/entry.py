@@ -6,10 +6,20 @@
 
 from __future__ import annotations
 
-from indicators import bollinger, closes, macd, rolling_max, rsi, sma, volumes
+from indicators import bollinger, closes, macd, roc, rolling_max, rsi, sma, volumes
 from trading_core.models import OrderSide
 
 from .view import EntryEvent, MarketView
+
+
+def _momentum_score(view: MarketView, period: int = 60) -> float:
+    """추세·돌파 계열 공통 랭킹 점수 — N봉 수익률(%).
+
+    슬롯이 부족할 때 '가장 강하게 오르는 종목부터' 담는다
+    (Clenow/Jegadeesh 상대 모멘텀 랭킹의 단순화).
+    """
+    r = roc(closes(view.primary), period)
+    return r[-1] if r and r[-1] is not None else 0.0
 
 
 class BollingerTouchEntry:
@@ -34,6 +44,7 @@ class BollingerTouchEntry:
             return EntryEvent(
                 OrderSide.BUY, 0.7,
                 f"볼린저({self.period},{self.k}) 하단 반등: {xs[-2]:.0f}→{xs[-1]:.0f}",
+                score=(lower[-2] - xs[-2]) / lower[-2] * 100,
             )
         return None
 
@@ -54,6 +65,7 @@ class RSIReboundEntry:
             return EntryEvent(
                 OrderSide.BUY, 0.7,
                 f"RSI({self.period}) 과매도 탈출: {r[-2]:.1f}→{r[-1]:.1f}",
+                score=self.threshold - r[-2],
             )
         return None
 
@@ -75,6 +87,7 @@ class MACrossEntry:
             return EntryEvent(
                 OrderSide.BUY, 0.7,
                 f"골든크로스 MA{self.fast}({f[-1]:.0f}) > MA{self.slow}({s[-1]:.0f})",
+                score=_momentum_score(view),
             )
         return None
 
@@ -97,6 +110,7 @@ class BreakoutEntry:
             return EntryEvent(
                 OrderSide.BUY, 0.7,
                 f"{self.lookback}봉 신고가 돌파: 종가 {close:.0f} > 전고 {level:.0f}",
+                score=_momentum_score(view),
             )
         return None
 
@@ -116,6 +130,7 @@ class MACDCrossEntry:
             return EntryEvent(
                 OrderSide.BUY, 0.7,
                 f"MACD 상향돌파: {m[-1]:.1f} > signal {s[-1]:.1f}",
+                score=_momentum_score(view),
             )
         return None
 
@@ -140,6 +155,7 @@ class RSIBelowEntry:
             return EntryEvent(
                 OrderSide.BUY, 0.7,
                 f"RSI({self.period})={r[-1]:.1f} < {self.threshold} 과매도",
+                score=self.threshold - r[-1],
             )
         return None
 
@@ -166,6 +182,7 @@ class BBZoneEntry:
             return EntryEvent(
                 OrderSide.BUY, 0.7,
                 f"매수존 진입: 종가 {xs[-1]:.0f} > +{self.k}σ({upper[-1]:.0f})",
+                score=_momentum_score(view),
             )
         return None
 
@@ -195,6 +212,7 @@ class RSIBBBreakoutEntry:
             return EntryEvent(
                 OrderSide.BUY, 0.7,
                 f"RSI({valid[-1]:.0f})가 RSI-BB 상단({upper[-1]:.0f}) 상향 돌파",
+                score=_momentum_score(view),
             )
         return None
 
@@ -226,6 +244,7 @@ class RSISignalCrossEntry:
             return EntryEvent(
                 OrderSide.BUY, 0.6,
                 f"RSI({valid[-1]:.0f})가 시그널({sig[-1]:.0f}≤{self.max_signal})을 골든크로스",
+                score=self.max_signal - sig[-1],
             )
         return None
 
@@ -269,6 +288,7 @@ class IchimokuCloudBounceEntry:
             return EntryEvent(
                 OrderSide.BUY, 0.7,
                 f"양운 지지 장대양봉: 저가 {float(last.low):.0f} ≤ 구름상단 {cloud_top:.0f}",
+                score=_momentum_score(view),
             )
         return None
 
@@ -317,6 +337,7 @@ class BoxBreakoutEntry:
             return EntryEvent(
                 OrderSide.BUY, 0.7,
                 f"박스({range_pct:.1f}%폭) 돌파 장대양봉 + 거래량 {vols[-1]/v_ma[-2]:.1f}배",
+                score=_momentum_score(view),
             )
         return None
 
@@ -341,6 +362,7 @@ class NDayLowEntry:
             return EntryEvent(
                 OrderSide.BUY, 0.7,
                 f"{self.lookback}일 최저 종가 {xs[-1]:.0f}",
+                score=(max(window) - xs[-1]) / xs[-1] * 100,
             )
         return None
 
@@ -363,7 +385,9 @@ class IBSEntry:
             return None
         if vals[-1] < self.threshold:
             return EntryEvent(
-                OrderSide.BUY, 0.7, f"IBS {vals[-1]:.2f} < {self.threshold} (저가권 마감)"
+                OrderSide.BUY, 0.7,
+                f"IBS {vals[-1]:.2f} < {self.threshold} (저가권 마감)",
+                score=self.threshold - vals[-1],
             )
         return None
 
@@ -386,9 +410,70 @@ class ConsecutiveDownEntry:
             cur, prev = candles[-1 - i], candles[-2 - i]
             if not (cur.high < prev.high and cur.low < prev.low):
                 return None
-        return EntryEvent(
-            OrderSide.BUY, 0.7, f"{self.days}일 연속 고점·저점 하락 후 진입"
+        decline = float(
+            (candles[-1 - self.days].close - candles[-1].close)
+            / candles[-1 - self.days].close * 100
         )
+        return EntryEvent(
+            OrderSide.BUY, 0.7,
+            f"{self.days}일 연속 고점·저점 하락 후 진입 (누적 {decline:.1f}%)",
+            score=decline,
+        )
+
+
+class IchimokuTKCrossEntry:
+    """일목 전환선이 기준선을 상향 돌파 (TK 크로스) — 일목의 기본 매수 신호.
+
+    출처: 一目均衡表 (호소다 고이치) 정통 신호. 전환선(9)/기준선(26).
+    """
+
+    def __init__(self, tenkan: int = 9, kijun: int = 26, senkou: int = 52):
+        self.name = f"ichimoku_tk({tenkan},{kijun})"
+        self.tenkan, self.kijun, self.senkou = tenkan, kijun, senkou
+
+    def check(self, view: MarketView) -> EntryEvent | None:
+        from indicators import ichimoku
+
+        candles = view.primary
+        t, k, _, _ = ichimoku(candles, self.tenkan, self.kijun, self.senkou)
+        if len(t) < 2 or None in (t[-2], t[-1], k[-2], k[-1]):
+            return None
+        if t[-2] <= k[-2] and t[-1] > k[-1]:
+            return EntryEvent(
+                OrderSide.BUY, 0.7,
+                f"TK크로스: 전환선 {t[-1]:.0f} > 기준선 {k[-1]:.0f}",
+                score=_momentum_score(view),
+            )
+        return None
+
+
+class IchimokuKumoBreakoutEntry:
+    """가격이 구름 상단을 상향 돌파 (Kumo breakout) — 추세 전환 신호.
+
+    출처: 一目均衡表 정통 신호. 구름은 저항대이므로 완전 돌파를 전환으로 본다.
+    """
+
+    def __init__(self, tenkan: int = 9, kijun: int = 26, senkou: int = 52):
+        self.name = f"ichimoku_kumo({tenkan},{kijun},{senkou})"
+        self.tenkan, self.kijun, self.senkou = tenkan, kijun, senkou
+
+    def check(self, view: MarketView) -> EntryEvent | None:
+        from indicators import ichimoku
+
+        candles = view.primary
+        xs = closes(candles)
+        _, _, span_a, span_b = ichimoku(candles, self.tenkan, self.kijun, self.senkou)
+        if len(xs) < 2 or None in (span_a[-2], span_b[-2], span_a[-1], span_b[-1]):
+            return None
+        top_prev = max(span_a[-2], span_b[-2])
+        top_now = max(span_a[-1], span_b[-1])
+        if xs[-2] <= top_prev and xs[-1] > top_now:
+            return EntryEvent(
+                OrderSide.BUY, 0.7,
+                f"구름 상향 돌파: 종가 {xs[-1]:.0f} > 구름상단 {top_now:.0f}",
+                score=_momentum_score(view),
+            )
+        return None
 
 
 class VolumeSpikeReversalEntry:
@@ -410,5 +495,6 @@ class VolumeSpikeReversalEntry:
             return EntryEvent(
                 OrderSide.BUY, 0.6,
                 f"거래량 급증 양봉: vol {vols[-1]:.0f} ≥ {self.vol_mult}×MA({v_ma[-2]:.0f})",
+                score=vols[-1] / v_ma[-2],
             )
         return None

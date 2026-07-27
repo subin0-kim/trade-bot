@@ -54,6 +54,10 @@ class EntryEvent:
     side: OrderSide
     strength: float
     reason: str
+    # 슬롯 부족 시 후보 선별용 랭킹 점수 (높을수록 우선 집행).
+    # 전략별 의미가 다르지만 한 번에 한 전략만 가동되므로 내부 일관성만 있으면 된다.
+    # 평균회귀: 과매도 깊이 / 추세·돌파: 모멘텀 강도.
+    score: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -68,6 +72,7 @@ class Decision:
     side: OrderSide | None = None
     quantity: Decimal = Decimal(0)
     reasons: tuple[str, ...] = ()
+    score: float = 0.0              # 진입 후보 랭킹 점수 (EntryEvent에서 전달)
 
     @classmethod
     def hold(cls, *reasons: str) -> "Decision":

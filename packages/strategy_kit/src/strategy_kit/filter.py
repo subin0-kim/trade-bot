@@ -118,6 +118,74 @@ class MACompareFilter:
         return False, f"역배열 (MA{self.fast} ≤ MA{self.slow})"
 
 
+class RSIRangeFilter:
+    """RSI가 지정 구간 안일 때만 허용 — 진입 신호의 과매도/과열 상호 확인용.
+
+    볼린저+RSI 정통 조합("하단 터치 AND RSI 과매도")의 RSI 쪽 조건.
+    """
+
+    def __init__(self, period: int = 14, min_rsi: float | None = None,
+                 max_rsi: float | None = None):
+        self.name = f"rsi_range({period},{min_rsi}~{max_rsi})"
+        self.period = period
+        self.min_rsi = min_rsi
+        self.max_rsi = max_rsi
+
+    def allow(self, view: MarketView, event: EntryEvent) -> tuple[bool, str]:
+        from indicators import rsi
+
+        r = rsi(closes(view.primary), self.period)
+        if not r or r[-1] is None:
+            return False, f"RSI({self.period}) 워밍업 부족"
+        val = r[-1]
+        if self.max_rsi is not None and val > self.max_rsi:
+            return False, f"RSI {val:.1f} > {self.max_rsi} (과매도 아님)"
+        if self.min_rsi is not None and val < self.min_rsi:
+            return False, f"RSI {val:.1f} < {self.min_rsi}"
+        return True, f"RSI {val:.1f} 확인"
+
+
+class AboveCloudFilter:
+    """종가가 일목 구름 위일 때만 허용 (삼역호전 조건 2)."""
+
+    def __init__(self, tenkan: int = 9, kijun: int = 26, senkou: int = 52):
+        self.name = f"above_cloud({tenkan},{kijun},{senkou})"
+        self.tenkan, self.kijun, self.senkou = tenkan, kijun, senkou
+
+    def allow(self, view: MarketView, event: EntryEvent) -> tuple[bool, str]:
+        from indicators import ichimoku
+
+        candles = view.primary
+        xs = closes(candles)
+        _, _, span_a, span_b = ichimoku(candles, self.tenkan, self.kijun, self.senkou)
+        if span_a[-1] is None or span_b[-1] is None:
+            return False, "구름 워밍업 부족"
+        top = max(span_a[-1], span_b[-1])
+        if xs[-1] > top:
+            return True, f"구름 위 ({xs[-1]:.0f} > {top:.0f})"
+        return False, f"구름 아래/내부 ({xs[-1]:.0f} ≤ {top:.0f})"
+
+
+class ChikouFilter:
+    """후행스팬 조건 — 현재 종가가 N봉 전 종가보다 위 (삼역호전 조건 3).
+
+    후행스팬은 종가를 26봉 뒤로 그린 선이므로, '후행스팬이 당시 가격 위'는
+    '현재 종가 > 26봉 전 종가'와 동치다.
+    """
+
+    def __init__(self, lag: int = 26):
+        self.name = f"chikou({lag})"
+        self.lag = lag
+
+    def allow(self, view: MarketView, event: EntryEvent) -> tuple[bool, str]:
+        xs = closes(view.primary)
+        if len(xs) <= self.lag:
+            return False, "후행스팬 데이터 부족"
+        if xs[-1] > xs[-1 - self.lag]:
+            return True, f"후행스팬 상회 ({xs[-1]:.0f} > {self.lag}봉전 {xs[-1-self.lag]:.0f})"
+        return False, f"후행스팬 하회 ({xs[-1]:.0f} ≤ {self.lag}봉전 {xs[-1-self.lag]:.0f})"
+
+
 class MinerviniTrendFilter:
     """Minervini 트렌드 템플릿 — Stage 2 상승 추세 판정 (7개 조건 동시 충족).
 
