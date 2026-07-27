@@ -503,6 +503,18 @@ PRESETS: dict[str, dict] = {
         "tags": ["breakout", "intraday", "crypto"],
         "source": "변동성 돌파 + 장기MA 필터 (하락장 진입 차단). 원전엔 없는 자체 조합",
     },
+    "macd_zero_mtf": {
+        "entry": {"type": "macd_cross", "zero_line": True},
+        "filters": [{"type": "higher_tf_trend", "tf": "W", "ma_period": 10}],
+        "exits": [
+            {"type": "fixed_stop_take", "stop_pct": 5.0, "take_pct": 99.0},
+            {"type": "atr_trailing", "period": 14, "mult": 3.0},
+        ],
+        "sizer": {"type": "atr_risk", "risk_pct": 1.0},
+        "primary_tf": "D", "higher_tfs": ["W"],
+        "tags": ["trend_follow", "mtf"],
+        "source": "macd_trend_mtf + 제로라인 필터 — Trading Rush 100회 실측(62% vs 53%, youtube.com/watch?v=nmffSjdZbWQ) 근거의 개선 가설",
+    },
     "double_rsi": {
         "entry": {"type": "double_rsi_cross", "fast": 7, "slow": 21},
         "filters": [],

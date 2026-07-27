@@ -116,20 +116,31 @@ class BreakoutEntry:
 
 
 class MACDCrossEntry:
-    """MACD선이 시그널선을 상향 돌파."""
+    """MACD선이 시그널선을 상향 돌파.
 
-    def __init__(self, fast: int = 12, slow: int = 26, signal: int = 9):
-        self.name = f"macd_cross({fast},{slow},{signal})"
+    zero_line=True면 크로스가 **제로라인 아래에서 발생**한 경우만 유효.
+    출처: Trading Rush 100회 실측 (youtube.com/watch?v=nmffSjdZbWQ, 3.5M+ 조회) —
+    제로라인 필터 포함 62% vs 제거 시 53%. '추세 내 풀백 종료 지점'만 골라내는 효과.
+    """
+
+    def __init__(self, fast: int = 12, slow: int = 26, signal: int = 9,
+                 zero_line: bool = False):
+        zl = ",zl" if zero_line else ""
+        self.name = f"macd_cross({fast},{slow},{signal}{zl})"
         self.fast, self.slow, self.signal = fast, slow, signal
+        self.zero_line = zero_line
 
     def check(self, view: MarketView) -> EntryEvent | None:
         m, s, _ = macd(closes(view.primary), self.fast, self.slow, self.signal)
         if len(m) < 2 or None in (m[-2], m[-1], s[-2], s[-1]):
             return None
         if m[-2] <= s[-2] and m[-1] > s[-1]:
+            if self.zero_line and m[-1] >= 0:
+                return None  # 제로라인 위 크로스는 풀백 종료가 아님 — 스킵
             return EntryEvent(
                 OrderSide.BUY, 0.7,
-                f"MACD 상향돌파: {m[-1]:.1f} > signal {s[-1]:.1f}",
+                f"MACD 상향돌파{'(제로라인 아래)' if self.zero_line else ''}: "
+                f"{m[-1]:.1f} > signal {s[-1]:.1f}",
                 score=_momentum_score(view),
             )
         return None
