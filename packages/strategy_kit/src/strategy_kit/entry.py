@@ -565,6 +565,36 @@ class DoubleRSICrossEntry:
         return None
 
 
+class SuperTrendEntry:
+    """SuperTrend가 하락→상승으로 전환되는 봉에서 진입.
+
+    출처: Trading Rush 200회 실측 (youtube.com/watch?v=BnOo3BbtPRo) —
+    승률이 레짐에 정비례 (강추세 57% / 보통 46% / 횡보 36%, 손익분기 40%).
+    "레짐 필터 없이 상시 가동하면 계좌 파산 위험" — 원전이 직접 경고.
+    파라미터는 영상 미언급 → TradingView 기본값(10, 3) 사용.
+    """
+
+    def __init__(self, period: int = 10, mult: float = 3.0):
+        self.name = f"supertrend({period},{mult})"
+        self.period = period
+        self.mult = mult
+
+    def check(self, view: MarketView) -> EntryEvent | None:
+        from indicators import supertrend
+
+        candles = view.primary
+        trend, line = supertrend(candles, self.period, self.mult)
+        if len(trend) < 2 or trend[-2] is None or trend[-1] is None:
+            return None
+        if trend[-2] == -1 and trend[-1] == 1:
+            return EntryEvent(
+                OrderSide.BUY, 0.7,
+                f"SuperTrend 상승 전환 (라인 {line[-1]:,.0f})",
+                score=_momentum_score(view),
+            )
+        return None
+
+
 class VolumeSpikeReversalEntry:
     """거래량 급증 + 양봉 반전 진입 — 거래량이 평균의 배수 이상 + 종가>시가."""
 

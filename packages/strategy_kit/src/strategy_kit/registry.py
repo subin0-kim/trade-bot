@@ -43,6 +43,7 @@ ENTRY_TYPES = {
     "ichimoku_kumo_breakout": entry_mod.IchimokuKumoBreakoutEntry,
     "volatility_breakout": entry_mod.VolatilityBreakoutEntry,
     "double_rsi_cross": entry_mod.DoubleRSICrossEntry,
+    "supertrend": entry_mod.SuperTrendEntry,
 }
 
 FILTER_TYPES = {
@@ -77,6 +78,7 @@ EXIT_TYPES = {
     "ibs_above_exit": exit_mod.IBSExit,
     "new_day_exit": exit_mod.NewDayExit,
     "double_rsi_exit": exit_mod.DoubleRSICrossExit,
+    "supertrend_exit": exit_mod.SuperTrendExit,
 }
 
 SIZER_TYPES = {
@@ -502,6 +504,18 @@ PRESETS: dict[str, dict] = {
         "primary_tf": "60m", "higher_tfs": ["D"],
         "tags": ["breakout", "intraday", "crypto"],
         "source": "변동성 돌파 + 장기MA 필터 (하락장 진입 차단). 원전엔 없는 자체 조합",
+    },
+    "st_trend": {
+        "entry": {"type": "supertrend", "period": 10, "mult": 3.0},
+        "filters": [{"type": "price_above_ma", "period": 200}],
+        "exits": [
+            {"type": "fixed_stop_take", "stop_pct": 6.0, "take_pct": 99.0},
+            {"type": "supertrend_exit", "period": 10, "mult": 3.0},
+        ],
+        "sizer": {"type": "atr_risk", "risk_pct": 1.0},
+        "primary_tf": "D", "higher_tfs": [],
+        "tags": ["trend_follow"],
+        "source": "Trading Rush 200회 실측 (youtube.com/watch?v=BnOo3BbtPRo) — SuperTrend 전환 진입 + 200MA 필터. 실측: 강추세 57%/횡보 36% (손익분기 40%) — 레짐 의존 명시",
     },
     "macd_zero_mtf": {
         "entry": {"type": "macd_cross", "zero_line": True},

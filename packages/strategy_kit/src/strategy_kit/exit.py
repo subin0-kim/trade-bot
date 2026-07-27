@@ -311,6 +311,25 @@ class DoubleRSICrossExit:
         return None
 
 
+class SuperTrendExit:
+    """SuperTrend가 상승→하락으로 전환되면 청산 (트레일링 스탑 역할)."""
+
+    def __init__(self, period: int = 10, mult: float = 3.0):
+        self.name = f"supertrend_exit({period},{mult})"
+        self.period = period
+        self.mult = mult
+
+    def check(self, view: MarketView, position: OpenPosition) -> ExitEvent | None:
+        from indicators import supertrend
+
+        trend, line = supertrend(view.primary, self.period, self.mult)
+        if not trend or trend[-1] is None:
+            return None
+        if trend[-1] == -1:
+            return ExitEvent(f"SuperTrend 하락 전환 (라인 {line[-1]:,.0f})")
+        return None
+
+
 class NewDayExit:
     """날짜가 바뀌면 청산 — 변동성 돌파의 짝 (당일 청산 원칙).
 

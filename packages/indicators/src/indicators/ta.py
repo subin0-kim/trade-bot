@@ -308,6 +308,47 @@ def clenow_momentum(xs: list[float], period: int = 90) -> Series:
     return out
 
 
+def supertrend(
+    candles: list[Candle], period: int = 10, mult: float = 3.0
+) -> tuple[Series, Series]:
+    """SuperTrend — (추세 방향 시리즈 [+1/-1/None], 스탑라인 시리즈).
+
+    기본 밴드 = (고+저)/2 ± mult×ATR. 밴드는 추세 방향으로만 조여지고(래칫),
+    종가가 스탑라인을 넘으면 추세가 뒤집힌다. 유튜브에서 가장 널리 쓰이는
+    추세 지표 중 하나 (Trading Rush 200회 테스트 대상).
+    """
+    n = len(candles)
+    trend: Series = [None] * n
+    line: Series = [None] * n
+    a = atr(candles, period)
+
+    up_band = dn_band = None
+    cur = 1  # 1=상승, -1=하락
+    for i in range(n):
+        if a[i] is None:
+            continue
+        hl2 = (float(candles[i].high) + float(candles[i].low)) / 2
+        basic_up = hl2 + mult * a[i]
+        basic_dn = hl2 - mult * a[i]
+        close = float(candles[i].close)
+        prev_close = float(candles[i - 1].close) if i > 0 else close
+
+        # 래칫: 상단밴드는 내려가기만, 하단밴드는 올라가기만 (추세 유지 중)
+        if up_band is None:
+            up_band, dn_band = basic_up, basic_dn
+        else:
+            up_band = basic_up if (basic_up < up_band or prev_close > up_band) else up_band
+            dn_band = basic_dn if (basic_dn > dn_band or prev_close < dn_band) else dn_band
+
+        if cur == 1 and close < dn_band:
+            cur = -1
+        elif cur == -1 and close > up_band:
+            cur = 1
+        trend[i] = cur
+        line[i] = dn_band if cur == 1 else up_band
+    return trend, line
+
+
 def rolling_max(xs: list[float], period: int) -> Series:
     out: Series = [None] * len(xs)
     for i in range(period - 1, len(xs)):
