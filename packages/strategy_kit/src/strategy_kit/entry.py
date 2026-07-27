@@ -476,6 +476,84 @@ class IchimokuKumoBreakoutEntry:
         return None
 
 
+class VolatilityBreakoutEntry:
+    """변동성 돌파 — 당일 시가 + K × 전일 변동폭을 상향 돌파하면 진입.
+
+    출처: Larry Williams Volatility Breakout (1970s). 코인 커뮤니티에서 가장 널리 쓰이는 전략.
+      목표가 = 오늘 시가 + K × (전일 고가 - 전일 저가),  K는 통상 0.5
+    장중 체결이 필요해 일봉 엔진으로는 구현 불가했으나, 분봉 데이터 확보로 가능해졌다.
+
+    사용법: primary_tf를 분봉(60m 등), higher_tfs에 "D"를 두면
+    전일 완성 일봉에서 변동폭을, 기준 분봉에서 당일 시가를 얻는다.
+    24시간 시장(코인)에서는 자정 기준으로 '하루'가 나뉜다.
+    """
+
+    def __init__(self, k: float = 0.5, daily_tf: str = "D"):
+        self.name = f"volatility_breakout(K={k})"
+        self.k = k
+        self.daily_tf = daily_tf
+
+    def check(self, view: MarketView) -> EntryEvent | None:
+        daily = view.candles.get(self.daily_tf)
+        if not daily:
+            return None
+        prev = daily[-1]  # 완성된 직전 일봉 (오늘 봉은 포함되지 않음 — 미래참조 없음)
+        prev_range = float(prev.high - prev.low)
+        if prev_range <= 0:
+            return None
+
+        bars = view.primary
+        today = bars[-1].ts.date()
+        # 당일 첫 봉의 시가 = 오늘 시가
+        today_bars = [b for b in reversed(bars) if b.ts.date() == today]
+        if not today_bars:
+            return None
+        today_open = float(today_bars[-1].open)
+        target = today_open + self.k * prev_range
+
+        close_now = float(bars[-1].close)
+        close_prev = float(bars[-2].close) if len(bars) >= 2 else close_now
+        # 이번 봉에서 처음 돌파한 경우만 (이미 위에 있으면 재진입 방지)
+        if close_prev <= target < close_now:
+            return EntryEvent(
+                OrderSide.BUY, 0.7,
+                f"변동성돌파: 종가 {close_now:,.0f} > 목표 {target:,.0f} "
+                f"(시가 {today_open:,.0f} + {self.k}×{prev_range:,.0f})",
+                score=(close_now / target - 1) * 100,
+            )
+        return None
+
+
+class DoubleRSICrossEntry:
+    """단기 RSI가 장기 RSI를 상향 돌파 (더블 RSI 골든크로스).
+
+    출처: 유튜브 '어느 미친 수학자가 만든 RSI 단타 매매법' (N6ItrRIlpeI) —
+    RSI(7)와 RSI(21)를 겹쳐 크로스로 매매. 장기 RSI가 이동평균 역할을 대신한다.
+    표준 RSI만 사용해 완전 재현 가능 (같은 영상의 '타오 RSI' 계열은 비공개 지표라 제외).
+
+    ※ 영상 스스로 "고변동성 시장(코인 5분봉)에는 약점"이라 인정 — 검증 대상.
+    """
+
+    def __init__(self, fast: int = 7, slow: int = 21):
+        self.name = f"double_rsi({fast},{slow})"
+        self.fast = fast
+        self.slow = slow
+
+    def check(self, view: MarketView) -> EntryEvent | None:
+        xs = closes(view.primary)
+        rf = rsi(xs, self.fast)
+        rs = rsi(xs, self.slow)
+        if len(rf) < 2 or None in (rf[-2], rf[-1], rs[-2], rs[-1]):
+            return None
+        if rf[-2] <= rs[-2] and rf[-1] > rs[-1]:
+            return EntryEvent(
+                OrderSide.BUY, 0.7,
+                f"더블RSI 골든크로스: RSI{self.fast}({rf[-1]:.1f}) > RSI{self.slow}({rs[-1]:.1f})",
+                score=rf[-1] - rs[-1],
+            )
+        return None
+
+
 class VolumeSpikeReversalEntry:
     """거래량 급증 + 양봉 반전 진입 — 거래량이 평균의 배수 이상 + 종가>시가."""
 

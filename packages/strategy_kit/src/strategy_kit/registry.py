@@ -41,6 +41,8 @@ ENTRY_TYPES = {
     "consecutive_down": entry_mod.ConsecutiveDownEntry,
     "ichimoku_tk_cross": entry_mod.IchimokuTKCrossEntry,
     "ichimoku_kumo_breakout": entry_mod.IchimokuKumoBreakoutEntry,
+    "volatility_breakout": entry_mod.VolatilityBreakoutEntry,
+    "double_rsi_cross": entry_mod.DoubleRSICrossEntry,
 }
 
 FILTER_TYPES = {
@@ -73,6 +75,8 @@ EXIT_TYPES = {
     "ichimoku_exit": exit_mod.IchimokuCloudExit,
     "n_day_high_exit": exit_mod.NDayHighExit,
     "ibs_above_exit": exit_mod.IBSExit,
+    "new_day_exit": exit_mod.NewDayExit,
+    "double_rsi_exit": exit_mod.DoubleRSICrossExit,
 }
 
 SIZER_TYPES = {
@@ -459,6 +463,57 @@ PRESETS: dict[str, dict] = {
         "primary_tf": "D", "higher_tfs": [],
         "tags": ["trend_follow", "confirmation"],
         "source": "一目均衡表 삼역호전(三役好転) — 일목 이론 최강 매수 신호: TK크로스 + 가격이 구름 위 + 후행스팬이 26봉 전 가격 위, 3조건 동시 충족",
+    },
+    # ------------------------------------------------------------------
+    # 코인 전용 (2026-07-27) — 분봉 데이터 확보로 구현 가능해진 장중 전략
+    # ------------------------------------------------------------------
+    "vol_breakout_05": {
+        "entry": {"type": "volatility_breakout", "k": 0.5},
+        "filters": [],
+        "exits": [
+            {"type": "fixed_stop_take", "stop_pct": 3.0, "take_pct": 99.0},
+            {"type": "new_day_exit"},
+        ],
+        "sizer": {"type": "fixed_fraction", "fraction": 0.2},
+        "primary_tf": "60m", "higher_tfs": ["D"],
+        "tags": ["breakout", "intraday", "crypto"],
+        "source": "Larry Williams 변동성 돌파 (1970s) — 목표가 = 당일시가 + 0.5×전일변동폭, 당일 청산. 코인 커뮤니티 표준 전략",
+    },
+    "vol_breakout_03": {
+        "entry": {"type": "volatility_breakout", "k": 0.3},
+        "filters": [],
+        "exits": [
+            {"type": "fixed_stop_take", "stop_pct": 3.0, "take_pct": 99.0},
+            {"type": "new_day_exit"},
+        ],
+        "sizer": {"type": "fixed_fraction", "fraction": 0.2},
+        "primary_tf": "60m", "higher_tfs": ["D"],
+        "tags": ["breakout", "intraday", "crypto"],
+        "source": "변동성 돌파 K=0.3 변형 (민감도 비교용)",
+    },
+    "vol_breakout_ma": {
+        "entry": {"type": "volatility_breakout", "k": 0.5},
+        "filters": [{"type": "price_above_ma", "period": 120}],  # 상승 국면에서만
+        "exits": [
+            {"type": "fixed_stop_take", "stop_pct": 3.0, "take_pct": 99.0},
+            {"type": "new_day_exit"},
+        ],
+        "sizer": {"type": "fixed_fraction", "fraction": 0.2},
+        "primary_tf": "60m", "higher_tfs": ["D"],
+        "tags": ["breakout", "intraday", "crypto"],
+        "source": "변동성 돌파 + 장기MA 필터 (하락장 진입 차단). 원전엔 없는 자체 조합",
+    },
+    "double_rsi": {
+        "entry": {"type": "double_rsi_cross", "fast": 7, "slow": 21},
+        "filters": [],
+        "exits": [
+            {"type": "fixed_stop_take", "stop_pct": 4.0, "take_pct": 99.0},
+            {"type": "double_rsi_exit", "fast": 7, "slow": 21},
+        ],
+        "sizer": {"type": "fixed_fraction", "fraction": 0.2},
+        "primary_tf": "D", "higher_tfs": [],
+        "tags": ["trend_follow", "crypto"],
+        "source": "유튜브 '어느 미친 수학자가 만든 RSI 단타 매매법' (youtube.com/watch?v=N6ItrRIlpeI) — RSI(7)/RSI(21) 크로스. 같은 영상의 '타오 RSI' 계열 2종은 비공개 지표라 제외",
     },
     "turtle_20_10_atr": {
         "entry": {"type": "breakout", "lookback": 20},

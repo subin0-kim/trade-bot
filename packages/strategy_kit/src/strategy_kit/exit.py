@@ -291,6 +291,42 @@ class IBSExit:
         return None
 
 
+class DoubleRSICrossExit:
+    """단기 RSI가 장기 RSI를 하향 돌파하면 청산 (더블 RSI 데드크로스)."""
+
+    def __init__(self, fast: int = 7, slow: int = 21):
+        self.name = f"double_rsi_exit({fast},{slow})"
+        self.fast = fast
+        self.slow = slow
+
+    def check(self, view: MarketView, position: OpenPosition) -> ExitEvent | None:
+        from indicators import rsi
+
+        xs = closes(view.primary)
+        rf, rs = rsi(xs, self.fast), rsi(xs, self.slow)
+        if len(rf) < 2 or None in (rf[-2], rf[-1], rs[-2], rs[-1]):
+            return None
+        if rf[-2] >= rs[-2] and rf[-1] < rs[-1]:
+            return ExitEvent(f"더블RSI 데드크로스: RSI{self.fast}({rf[-1]:.1f}) < RSI{self.slow}({rs[-1]:.1f})")
+        return None
+
+
+class NewDayExit:
+    """날짜가 바뀌면 청산 — 변동성 돌파의 짝 (당일 청산 원칙).
+
+    출처: Larry Williams 변동성 돌파는 '종가(또는 다음 날 시가) 전량 청산'이 원전 규칙.
+    24시간 시장에서는 자정을 기준으로 하루가 나뉜다.
+    """
+
+    def __init__(self):
+        self.name = "new_day_exit"
+
+    def check(self, view: MarketView, position: OpenPosition) -> ExitEvent | None:
+        if view.now.date() > position.entry_ts.date():
+            return ExitEvent(f"익일 청산 (진입 {position.entry_ts.date()})")
+        return None
+
+
 class BollingerMidExit:
     """볼린저 중심선 복귀 청산 — 평균회귀 진입의 짝 (목표 = 평균)."""
 
