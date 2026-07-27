@@ -13,6 +13,7 @@
 - `packages/regime` (`regime`): 시장 레짐 판별 (KOSPI 지수 → bull/bear/sideways, 히스테리시스)
 - `apps/bot_swing`: **스윙봇 (운용 단계)** — 하루 1회 메인 사이클(현금/connors/macd + US필터) + 장중 손절 감시(`monitor.py`, 매수 없는 리스크 오버레이), 상태 영속화(`data/state/`)
 - `apps/dashboard`: 이벤트 로그 → self-contained HTML 대시보드 (`uv run dashboard-build`)
+- `apps/bot_coin`: **코인봇 (전방 검증 단계)** — 검증 2전략(BTC정배열→알트돌파 / 오픈쇼크→알트추종) + 부정지식 필터. **봇 원장에 기록된 포지션만 관리 (기존 보유 자산 불가침)**, 예산 상한제
 - `apps/bot_scalper`: 단타봇 (분봉 기반 — 분봉 전략 게이트 통과 후 본격 개발)
 - 예정: `apps/commander` (레짐 판별 → 정책 발행), `packages/broker_upbit`
 - `wiki/`: LLM-wiki (아래 스키마 참고)
@@ -44,6 +45,7 @@ uv run python scripts/universe_backtest.py                 # 유니버스 37종�
 uv run python scripts/portfolio_backtest.py                # 포트폴리오 백테스트 (캐시 필요)
 uv run bot-swing                                           # 스윙봇 1사이클 (dry-run, 하루 1회, 09시 권장)
 uv run bot-swing-monitor --loop                            # 장중 손절 감시 (매수 없음, 30분 간격)
+uv run bot-coin                                            # 코인봇 1사이클 (dry-run, 시간당 권장)
 uv run dashboard-build                                     # 대시보드 HTML 갱신
 uv run python scripts/collect_minutes.py                   # 분봉 아카이브 증분 수집
 ```

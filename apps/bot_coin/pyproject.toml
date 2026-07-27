@@ -1,0 +1,27 @@
+[project]
+name = "bot-coin"
+version = "0.1.0"
+description = "코인봇 — 검증 전략 2종 (BTC 정배열→알트 돌파 / BTC 오픈쇼크→알트 추종)"
+requires-python = ">=3.11"
+dependencies = [
+    "trading-core",
+    "broker-upbit",
+    "strategy-kit",
+    "trading-indicators",
+]
+
+[project.scripts]
+bot-coin = "bot_coin.main:main"
+
+[tool.uv.sources]
+trading-core = { workspace = true }
+broker-upbit = { workspace = true }
+strategy-kit = { workspace = true }
+trading-indicators = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/bot_coin"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

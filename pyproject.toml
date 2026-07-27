@@ -6,6 +6,7 @@ requires-python = ">=3.11"
 dependencies = [
     "bot-scalper",
     "bot-swing",
+    "bot-coin",
     "trading-indicators",
     "strategy-kit",
     "trading-backtest",
@@ -20,6 +21,7 @@ members = ["packages/*", "apps/*"]
 [tool.uv.sources]
 bot-scalper = { workspace = true }
 bot-swing = { workspace = true }
+bot-coin = { workspace = true }
 trading-indicators = { workspace = true }
 strategy-kit = { workspace = true }
 trading-backtest = { workspace = true }
