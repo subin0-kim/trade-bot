@@ -11,6 +11,7 @@ dependencies = [
     "trading-backtest",
     "trading-regime",
     "trading-dashboard",
+    "broker-upbit",
 ]
 
 [tool.uv.workspace]
@@ -24,6 +25,7 @@ strategy-kit = { workspace = true }
 trading-backtest = { workspace = true }
 trading-regime = { workspace = true }
 trading-dashboard = { workspace = true }
+broker-upbit = { workspace = true }
 
 [tool.uv]
 package = false

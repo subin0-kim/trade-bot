@@ -12,6 +12,10 @@
 
 - [[scalper-overview]] — 단타봇 개요와 현재 상태 (2026-07-23, sources: 1)
 
+## shared/brokers/upbit
+
+- [[upbit-api-notes]] — JWT 인증, 그룹별 레이트리밋, 주식과의 시장 규칙 차이(거래세 0·24시간·모의투자 없음) (2026-07-27)
+
 ## shared/strategies
 
 - [[strategy-framework]] — 전략 모듈 분해 스키마, 등재 게이트, MTF 규칙 (2026-07-26)

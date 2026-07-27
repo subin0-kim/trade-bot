@@ -1,0 +1,21 @@
+[project]
+name = "broker-upbit"
+version = "0.1.0"
+description = "업비트 Open API 어댑터 (trading-core Broker 구현)"
+requires-python = ">=3.11"
+dependencies = [
+    "trading-core",
+    "requests>=2.31",
+    "pyyaml>=6.0",
+    "pyjwt>=2.8",
+]
+
+[tool.uv.sources]
+trading-core = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/broker_upbit"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

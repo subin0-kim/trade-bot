@@ -6,6 +6,7 @@
 
 - `packages/core` (`trading_core`): 브로커 비종속 도메인 모델, Broker Protocol, DryRunBroker, 리스크 엔진, 정책, 이벤트 로그
 - `packages/broker_kis` (`broker_kis`): KIS Open API 어댑터
+- `packages/broker_upbit` (`broker_upbit`): 업비트 Open API 어댑터 (JWT 인증, 24시간·거래세0·소수점수량)
 - `packages/indicators` (`indicators`): 기술적 지표 (시리즈 정렬 반환, float)
 - `packages/strategy_kit` (`strategy_kit`): 전략 모듈 분해 — Entry/Filter/Exit/Sizing 조립식. 전략 정의는 `registry.PRESETS` 설정 dict
 - `packages/backtest` (`backtest`): 백테스트 엔진 3종 — 단일종목/포트폴리오/레짐스위칭 (MTF 완성봉만 노출, 다음 봉 시가 체결, 비용 모델)
@@ -50,6 +51,7 @@ uv run python scripts/collect_minutes.py                   # 분봉 아카이브
 이벤트 스키마(`data/events/*.jsonl`): `entry`/`exit`(pnl, win, reasons)/`equity`(일별) — 대시보드·wiki ingest의 원천. 스키마 정의는 `scripts/emit_backtest_events.py` docstring.
 
 KIS 인증정보는 `D:/kis/config/kis_devlp.yaml` (repo 밖, 공식 샘플과 동일 포맷. `KIS_CONFIG_PATH`로 변경 가능). 토큰 캐시는 `D:/kis/config/tokens/`.
+업비트 인증정보는 `D:/upbit/config/upbit.yaml` (`UPBIT_CONFIG_PATH`로 변경 가능). **업비트는 모의투자 환경이 없으므로 DryRunBroker가 유일한 안전장치.**
 
 ### 환경 주의사항 (Windows + 한글 경로)
 
