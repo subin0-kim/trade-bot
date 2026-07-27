@@ -10,7 +10,7 @@
 - `packages/strategy_kit` (`strategy_kit`): 전략 모듈 분해 — Entry/Filter/Exit/Sizing 조립식. 전략 정의는 `registry.PRESETS` 설정 dict
 - `packages/backtest` (`backtest`): 백테스트 엔진 3종 — 단일종목/포트폴리오/레짐스위칭 (MTF 완성봉만 노출, 다음 봉 시가 체결, 비용 모델)
 - `packages/regime` (`regime`): 시장 레짐 판별 (KOSPI 지수 → bull/bear/sideways, 히스테리시스)
-- `apps/bot_swing`: **스윙봇 (운용 단계)** — 하루 1회, 검증 구성(현금/connors/macd + US필터), 상태 영속화(`data/state/`)
+- `apps/bot_swing`: **스윙봇 (운용 단계)** — 하루 1회 메인 사이클(현금/connors/macd + US필터) + 장중 손절 감시(`monitor.py`, 매수 없는 리스크 오버레이), 상태 영속화(`data/state/`)
 - `apps/dashboard`: 이벤트 로그 → self-contained HTML 대시보드 (`uv run dashboard-build`)
 - `apps/bot_scalper`: 단타봇 (분봉 기반 — 분봉 전략 게이트 통과 후 본격 개발)
 - 예정: `apps/commander` (레짐 판별 → 정책 발행), `packages/broker_upbit`
@@ -41,7 +41,8 @@ uv run python scripts/backtest_demo.py --offline           # 합성 데이터 �
 uv run python scripts/backtest_demo.py --symbol 005930     # KIS 일봉 백테스트
 uv run python scripts/universe_backtest.py                 # 유니버스 37종목 × 3구간 (일봉 캐시 생성)
 uv run python scripts/portfolio_backtest.py                # 포트폴리오 백테스트 (캐시 필요)
-uv run bot-swing                                           # 스윙봇 1사이클 (dry-run, 하루 1회)
+uv run bot-swing                                           # 스윙봇 1사이클 (dry-run, 하루 1회, 09시 권장)
+uv run bot-swing-monitor --loop                            # 장중 손절 감시 (매수 없음, 30분 간격)
 uv run dashboard-build                                     # 대시보드 HTML 갱신
 uv run python scripts/collect_minutes.py                   # 분봉 아카이브 증분 수집
 ```

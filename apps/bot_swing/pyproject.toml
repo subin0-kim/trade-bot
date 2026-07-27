@@ -13,6 +13,7 @@ dependencies = [
 
 [project.scripts]
 bot-swing = "bot_swing.main:main"
+bot-swing-monitor = "bot_swing.monitor:main"
 
 [tool.uv.sources]
 trading-core = { workspace = true }
