@@ -23,6 +23,7 @@
 - [[connors-rsi2]] — ✅ 게이트 통과, SIDEWAYS 슬롯. Connors & Alvarez (2008) (2026-07-27)
 - [[turtle-20-10]] — ✅ 게이트 통과, BULL 백업. 터틀 System 1 (2026-07-27)
 - [[timeframe-comparison]] — 60분봉 vs 일봉: 평균회귀는 붕괴, 추세추종은 개선 (2026-07-27)
+- [[crypto-condition-switching]] — 코인 2호 생존 전략: BTC 정배열→알트 돌파, 분할 양쪽 +/벤치 상회 (2026-07-27)
 - [[performance-chasing-verdict]] — 성과 추종 스위칭 기각: 순위 자기상관 -0.14, follow_winner가 9정책 중 8위 (2026-07-27)
 - [[walkforward-validation]] — 워크포워드 프레임: IS선택/OOS측정 분리. 코인 메이저·알트 모두 OOS 마이너스 (2026-07-27)
 - [[crypto-principle-strategies]] — 원리 기반 설계: btc_shock_alt_follow 첫 분할검증 통과, 급등익일 역신호 발견 (2026-07-27)
