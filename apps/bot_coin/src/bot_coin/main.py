@@ -53,6 +53,7 @@ SHOCK_THRESHOLD_PCT = 1.0
 SHOCK_BASKET_N = 10          # 쇼크 이벤트 시 매수할 알트 수 (24h 거래대금 상위)
 SURGE_SKIP_PCT = 20.0        # 전일 급등 진입 금지 임계
 CORE_FRACTION = Decimal("0.5")   # 초록불 시 BTC 코어 홀드 비중 (검증: 50:50 결합 ✓)
+BREAKOUT_MIN_BULL_AGE = 5        # 위성 진입은 초록불 5일차부터 (전환 직후 깜빡임 구간 패배 실측)
 FEE = Decimal("0.0005")
 
 
@@ -72,8 +73,11 @@ def completed_240m(broker: UpbitBroker, symbol: str, count: int = 120):
     return [b for b in bars if b.ts + timedelta(minutes=240) <= now]
 
 
-def btc_regime(broker: UpbitBroker) -> str:
+def btc_regime(broker: UpbitBroker) -> tuple[str, int]:
     """BTC 일봉 앙상블 레짐 — {ROC30>0, SuperTrend(10,3), MA10>MA30} 2/3 다수결.
+
+    반환: (레짐, 초록불 연속일수). 위성(돌파) 진입은 5일차부터만 —
+    전환 직후 깜빡임 구간의 패배 실측 (bull_age<5: 승률 25.5%/평균 -1.75%).
 
     2026-07 기준 심사: 3개 강건 가족의 다수결이 '가장 나쁜 반쪽' 최고
     (BTC 코어 +120.7%, 전반 +75/후반 +26 ✓ — wiki/crypto-condition-switching).
@@ -87,22 +91,28 @@ def btc_regime(broker: UpbitBroker) -> str:
     done = [c for c in daily if c.ts.date() < date.today()]
     xs = closes(done)
     if len(xs) < 65:
-        return "unknown"
-    votes = 0
+        return "unknown", 0
     r30 = roc(xs, 30)
-    if r30[-1] is not None and r30[-1] > 0:
-        votes += 1
     st, _ = supertrend(done, 10, 3.0)
-    if st[-1] == 1:
-        votes += 1
     ma10, ma30 = sma(xs, 10), sma(xs, 30)
-    if ma10[-1] is not None and ma30[-1] is not None and ma10[-1] > ma30[-1]:
-        votes += 1
-    logger.info("레짐 투표: ROC30 %s, SuperTrend %s, MA10>30 %s → %d/3",
+    flags = []
+    for i in range(len(done)):
+        votes = sum([
+            1 if (r30[i] is not None and r30[i] > 0) else 0,
+            1 if st[i] == 1 else 0,
+            1 if (ma10[i] is not None and ma30[i] is not None and ma10[i] > ma30[i]) else 0,
+        ])
+        flags.append(votes >= 2)
+    bull_age = 0
+    for f in reversed(flags):
+        if not f:
+            break
+        bull_age += 1
+    logger.info("레짐 투표: ROC30 %s, SuperTrend %s, MA10>30 %s | 초록불 %d일째",
                 "○" if (r30[-1] or 0) > 0 else "×",
                 "○" if st[-1] == 1 else "×",
-                "○" if (ma10[-1] or 0) > (ma30[-1] or 1) else "×", votes)
-    return "bull" if votes >= 2 else "off"
+                "○" if (ma10[-1] or 0) > (ma30[-1] or 1) else "×", bull_age)
+    return ("bull" if flags[-1] else "off"), bull_age
 
 
 def btc_open_shock(broker: UpbitBroker) -> float | None:
@@ -194,8 +204,8 @@ def main():
     logger.info("코인봇 [%s] 현금 %s원, 보유 %d종목", mode, state.cash, len(state.positions))
 
     universe = load_universe(broker)
-    regime = btc_regime(broker)
-    logger.info("BTC 레짐: %s | 유니버스 %d종목", regime.upper(), len(universe))
+    regime, bull_age = btc_regime(broker)
+    logger.info("BTC 레짐: %s (%d일째) | 유니버스 %d종목", regime.upper(), bull_age, len(universe))
 
     breakout = build_preset("breakout_momo")
     now = datetime.now()
@@ -270,7 +280,9 @@ def main():
     # ---------- 4) bull_breakout 신규 진입 (위성 — 예산의 나머지 50%) ----------
     breakout_held = sum(1 for p in state.positions.values() if p.strategy == "bull_breakout")
     slots = MAX_BREAKOUT_POSITIONS - breakout_held
-    if regime == "bull" and slots > 0:
+    if regime == "bull" and bull_age < BREAKOUT_MIN_BULL_AGE:
+        logger.info("초록불 %d일째 < %d일 — 위성 진입 대기 (깜빡임 필터)", bull_age, BREAKOUT_MIN_BULL_AGE)
+    if regime == "bull" and bull_age >= BREAKOUT_MIN_BULL_AGE and slots > 0:
         candidates = []
         for symbol in universe:
             if symbol in state.positions:
