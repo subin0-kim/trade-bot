@@ -18,3 +18,6 @@ kis_devlp.yaml
 .idea/
 .vscode/
 Thumbs.db
+
+# Claude Code 로컬 설정
+.claude/
