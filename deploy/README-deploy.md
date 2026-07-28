@@ -42,8 +42,8 @@ systemctl list-timers          # 다음 실행 시각 확인
 
 | 타이머 | 주기 | 비고 |
 |---|---|---|
-| bot-coin | 매시 :05 (24시간) | 코인은 휴장 없음 |
-| bot-swing | 평일 09:05 | 공휴일은 봇이 자체 스킵 (KIS 휴장일 API + 캐시) |
+| bot-coin | 매시 :05 (24시간) | **⚠️ LIVE 실계좌** (`--live --yes`), 코인은 휴장 없음 |
+| bot-swing | 평일 09:05 | dry-run. 공휴일은 봇이 자체 스킵 (KIS 휴장일 API + 캐시) |
 | bot-swing-monitor | 평일 09:00~15:30 /30분 | 1회 점검 모드, 장시간·휴장 자체 판정 |
 | trading-backup | 매일 23:50 | data/ → /var/backups/trading (30개 보관) |
 
@@ -53,6 +53,43 @@ systemctl list-timers          # 다음 실행 시각 확인
 이 값으로 생성되므로 **가동 전에 원하는 값으로 확정**할 것 (이후 변경은 state 파일 수정).
 스윙봇은 코드 상수 `INITIAL_CASH`(100만원). 봇은 계좌 잔고를 조회하지 않고 원장 현금만
 쓰므로, 계좌의 기존 보유 자산·예수금은 예산과 무관하게 불가침이다.
+
+## 3.5 코인봇 실전(LIVE) 전환 절차
+
+봇 원장에는 생성 당시 모드(`dry-run`/`live`)가 기록되며, **실행 모드와 다르면 봇이
+기동을 거부한다** (dry-run 가상 포지션을 실계좌에서 팔아버리는 사고 방지).
+전환 순서:
+
+```bash
+sudo systemctl stop bot-coin.timer
+
+# 1. dry-run 원장·이벤트 보관 (전방 검증 기록 — 삭제 금지)
+sudo -u trading mv /opt/stock-trade-bot/data/state/bot-coin.json \
+                   /opt/stock-trade-bot/data/state/bot-coin.json.dry-run.bak
+sudo -u trading cp /opt/stock-trade-bot/data/events/bot-coin.jsonl \
+                   /opt/stock-trade-bot/data/events/bot-coin.dry-run.jsonl
+# 이벤트 로그는 이어서 써도 됨 — entry/exit/equity에 mode(LIVE/DRY-RUN)가 찍힌다
+
+# 2. 계좌 준비 확인
+#    - 업비트 개발자센터: API 키에 '주문' 권한 + 서버 공인 IP 등록 여부
+#    - KRW 잔고 ≥ --budget (부족하면 봇이 경고 로그를 남기고 매수가 실패한다)
+
+# 3. 갱신된 unit 반영 (--live --yes 포함) 후 재시작
+sudo cp /opt/stock-trade-bot/deploy/systemd/bot-coin.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl start bot-coin.timer
+
+# 4. 첫 사이클 수동 실행 + 로그 확인 (타이머 기다릴 필요 없음)
+sudo systemctl start bot-coin.service
+journalctl -u bot-coin.service -n 50
+```
+
+첫 실행 때 원장이 `--budget` 현금으로 새로 생성된다. 첫 사이클에서 레짐이 초록불이면
+곧바로 코어(BTC/ETH) 매수가 나가는 게 정상 동작이다.
+
+**긴급 정지**: `sudo systemctl stop bot-coin.timer` — 이후 보유분을 정리하려면
+수동으로 1사이클씩 돌리거나 업비트 앱에서 직접 매도 후 원장(state 파일)에서 해당
+포지션을 제거한다 (원장에 남겨두면 봇이 이미 없는 코인을 팔려고 시도한다).
 
 ## 4. 대시보드 접근 (Tailscale — 포트 개방 없음)
 

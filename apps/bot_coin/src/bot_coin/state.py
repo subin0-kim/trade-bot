@@ -30,16 +30,19 @@ class CoinBotState:
     cash: str                             # 봇 할당 예산 중 현금
     positions: dict[str, CoinPosition] = field(default_factory=dict)
     last_shock_date: str = ""             # 쇼크 이벤트 중복 진입 방지 (YYYY-MM-DD)
+    mode: str = "dry-run"                 # "dry-run" | "live" — 원장이 만들어진 모드
 
     @classmethod
-    def load(cls, path: Path, budget: Decimal) -> "CoinBotState":
+    def load(cls, path: Path, budget: Decimal, mode: str = "dry-run") -> "CoinBotState":
         if not path.exists():
-            return cls(cash=str(budget))
+            return cls(cash=str(budget), mode=mode)
         raw = json.loads(path.read_text(encoding="utf-8"))
         return cls(
             cash=raw["cash"],
             positions={s: CoinPosition(**p) for s, p in raw.get("positions", {}).items()},
             last_shock_date=raw.get("last_shock_date", ""),
+            # 모드 필드가 없는 구버전 원장은 전부 dry-run 시절 것
+            mode=raw.get("mode", "dry-run"),
         )
 
     def save(self, path: Path) -> None:
@@ -48,7 +51,8 @@ class CoinBotState:
             json.dumps(
                 {"cash": self.cash,
                  "positions": {s: asdict(p) for s, p in self.positions.items()},
-                 "last_shock_date": self.last_shock_date},
+                 "last_shock_date": self.last_shock_date,
+                 "mode": self.mode},
                 ensure_ascii=False, indent=1,
             ),
             encoding="utf-8",

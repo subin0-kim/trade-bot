@@ -19,6 +19,7 @@
 실행:
   uv run bot-coin                      # dry-run 1사이클
   uv run bot-coin --live               # ⚠️ 실계좌 실주문 (확인 프롬프트)
+  uv run bot-coin --live --yes         # ⚠️ 무인 실행용 (systemd) — 프롬프트 생략
   uv run bot-coin --budget 500000      # 예산 변경 (기본 100만원)
 """
 
@@ -27,11 +28,12 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import sys
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
-from broker_upbit import UpbitBroker, align_price
+from broker_upbit import UpbitApiError, UpbitBroker, align_price
 from indicators import closes, roc, sma, supertrend
 from strategy_kit import MarketView, OpenPosition, build_preset
 from trading_core import JsonlEventLog, OrderRequest, OrderSide, OrderType
@@ -155,9 +157,14 @@ def place_buy(broker, state, events, symbol, krw_amount, strategy_tag, reasons, 
     entry_price = quote.price
     paid_fee = None
     if live:
-        order = broker.place_order(OrderRequest(
-            symbol=symbol, side=OrderSide.BUY, quantity=qty, order_type=OrderType.MARKET,
-        ))
+        try:
+            order = broker.place_order(OrderRequest(
+                symbol=symbol, side=OrderSide.BUY, quantity=qty, order_type=OrderType.MARKET,
+            ))
+        except UpbitApiError as e:
+            # 주문 1건 실패(잔고 부족·마켓 일시정지 등)가 사이클 전체를 죽이면 안 된다
+            logger.error("⚠️ %s 매수 주문 실패: %s — 이번 사이클 스킵", symbol, e)
+            return False
         filled, avg, paid_fee = broker.settle_order(order)
         if filled <= 0:
             logger.error("⚠️ %s 매수 미체결 (주문 %s) — 원장 기록 없음", symbol, order.order_id)
@@ -176,6 +183,7 @@ def place_buy(broker, state, events, symbol, krw_amount, strategy_tag, reasons, 
     events.append("entry", {
         "symbol": symbol, "name": symbol.replace("KRW-", ""), "quantity": str(qty),
         "price": str(entry_price), "strategy": strategy_tag, "reasons": reasons,
+        "mode": "LIVE" if live else "DRY-RUN",
     })
     return True
 
@@ -187,9 +195,13 @@ def place_sell(broker, state, events, pos: CoinPosition, reason, live):
     partial = False
     paid_fee = None
     if live:
-        order = broker.place_order(OrderRequest(
-            symbol=pos.symbol, side=OrderSide.SELL, quantity=qty, order_type=OrderType.MARKET,
-        ))
+        try:
+            order = broker.place_order(OrderRequest(
+                symbol=pos.symbol, side=OrderSide.SELL, quantity=qty, order_type=OrderType.MARKET,
+            ))
+        except UpbitApiError as e:
+            logger.error("⚠️ %s 매도 주문 실패: %s — 포지션 유지, 다음 사이클 재시도", pos.symbol, e)
+            return
         filled, avg, paid_fee = broker.settle_order(order)
         if filled <= 0:
             logger.error("⚠️ %s 매도 미체결 (주문 %s) — 포지션 유지, 다음 사이클 재시도",
@@ -217,24 +229,48 @@ def place_sell(broker, state, events, pos: CoinPosition, reason, live):
         "quantity": str(qty), "entry_price": pos.entry_price,
         "exit_price": str(exit_price), "pnl": str(pnl), "pnl_pct": round(pnl_pct, 3),
         "win": pnl > 0, "holding_bars": 0, "strategy": pos.strategy, "reasons": [reason],
+        "mode": "LIVE" if live else "DRY-RUN",
     })
 
 
 def main():
     parser = argparse.ArgumentParser(description="코인봇 (사이클당 1회)")
     parser.add_argument("--live", action="store_true", help="⚠️ 실계좌 실주문")
+    parser.add_argument("--yes", action="store_true",
+                        help="--live 확인 프롬프트 생략 (systemd 등 무인 실행용)")
     parser.add_argument("--budget", type=int, default=1_000_000, help="봇 할당 예산(원)")
     args = parser.parse_args()
 
-    if args.live:
+    if args.live and not args.yes:
+        if not sys.stdin.isatty():
+            logger.error("--live는 대화형 확인이 필요합니다. 무인 실행은 --live --yes로 명시하세요.")
+            sys.exit(2)
         if input("⚠️ 업비트 실계좌에 실주문이 나갑니다 (모의 환경 없음). 'yes' 입력: ") != "yes":
             return
 
     broker = UpbitBroker()
     events = JsonlEventLog(EVENTS_PATH, source=BOT_NAME)
-    state = CoinBotState.load(STATE_PATH, Decimal(args.budget))
     mode = "LIVE" if args.live else "DRY-RUN"
+    state_mode = "live" if args.live else "dry-run"
+    state = CoinBotState.load(STATE_PATH, Decimal(args.budget), mode=state_mode)
+
+    # 원장 모드 가드 — dry-run 가상 포지션을 물고 live로 돌면
+    # 실제로 산 적 없는 코인을 실계좌에서 팔게 된다 (불가침 규칙 위반).
+    if state.mode != state_mode:
+        logger.error(
+            "⛔ 원장 모드 불일치: 원장=%s, 실행=%s. 기존 원장을 보관 후 새로 시작하세요:\n"
+            "   mv %s %s.%s.bak", state.mode, state_mode,
+            STATE_PATH, STATE_PATH, state.mode)
+        sys.exit(3)
+
     logger.info("코인봇 [%s] 현금 %s원, 보유 %d종목", mode, state.cash, len(state.positions))
+
+    if args.live:
+        # 계좌 대조 — 원장 현금보다 실제 주문가능 KRW가 적으면 매수가 실패한다
+        bal = broker.get_balance()
+        if bal.available_cash < Decimal(state.cash):
+            logger.warning("⚠️ 계좌 주문가능 KRW %s < 원장 현금 %s — 입금 필요 (매수 실패 예상)",
+                           f"{bal.available_cash:,.0f}", f"{Decimal(state.cash):,.0f}")
 
     universe = load_universe(broker)
     regimes = {sym: asset_regime(broker, sym) for sym in CORE_ASSETS}

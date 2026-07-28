@@ -374,3 +374,19 @@
 - settle_order = 체결 대기 → 타임아웃 시 취소(Upbit DELETE /v1/order, KIS TTTC0013U) →
   취소-체결 경합 대비 최종 재조회 → 확정 (수량, 평균가) 반환
 - 봇 5개 호출부 전부 교체. 미체결 잔량은 항상 취소되므로 다음 사이클 재시도가 안전
+
+## [2026-07-28] ingest | 브로커 cancel_order 중복 정의 버그 + 코인봇 실전 전환 준비
+
+- 버그: 양쪽 어댑터 모두 cancel_order가 클래스에 2회 정의 — 파이썬은 나중 정의가 이겨
+  구버전이 신버전을 덮어씀. 업비트는 settle_order 미체결 경로가 NameError로 사이클 중단
+  (원장-실계좌 괴리 유발), KIS는 모의투자 취소가 실전 tr_id(TTTC0013U)로 나가 조용히 실패.
+  AST 스캔으로 발견 — 테스트 0건인 상태라 스모크 테스트 도입 필요 (미착수)
+- 실전 전환 준비 (코인봇만, 스윙봇은 dry-run 유지):
+  - 원장에 생성 모드(dry-run/live) 기록, 실행 모드 불일치 시 기동 거부 (exit 3)
+    — dry-run 가상 포지션을 실계좌에서 매도하는 사고 차단 (불가침 규칙의 마지막 방어선)
+  - --live --yes 무인 게이트: systemd(stdin 없음)에서 input()이 EOFError로 죽는 문제.
+    --yes 없이 비대화형이면 exit 2
+  - live 주문 1건 실패(UpbitApiError)가 사이클 전체를 죽이지 않게 격리 (매수 스킵/포지션 유지)
+  - live 기동 시 계좌 주문가능 KRW < 원장 현금이면 경고
+  - entry/exit 이벤트에 mode(LIVE/DRY-RUN) 태깅 — 전방 검증 기록과 실전 기록 구분
+- deploy: bot-coin.service --live --yes 반영, README-deploy.md에 전환 절차(3.5절) 추가
