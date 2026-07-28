@@ -55,15 +55,18 @@ CORE_ASSETS = ["KRW-BTC", "KRW-ETH"]  # 각자 자체 앙상블 게이트, 예�
 BREAKOUT_MIN_BULL_AGE = 5        # 위성 진입은 초록불 5일차부터 (전환 직후 깜빡임 구간 패배 실측)
 FEE = Decimal("0.0005")
 
-# 알트 유니버스 = 시가총액 상위 10 (2026-07-28 사용자 지시, 백테스트 검증:
-# 위성 후반 -10.4→+5.0 ✓, MDD 33.3→16.1, PF 1.57→2.02 — 대형주는 가짜 돌파가 적다).
+# 알트 유니버스 = 시가총액 상위 15 (2026-07-28 CoinGecko 기준, 사용자 지시).
+# 제외: BTC·ETH(코어 전담), 스테이블/연동자산(USDE·XAUT), 상장 200일 미만(CC),
+# 업비트 미상장(BNB·HYPE·ZEC·XMR 등). 백테스트: 위성 +74.8→+198.3%/PF 2.2/분할 ✓
+# (단, 현재 시총 순위로 과거를 검증한 생존 편향 있음 — 전방 검증이 최종 판정).
 # 시총 순위는 업비트 API에 없어 정적 고정 — 분기마다 수동 갱신할 것.
-TOP_MCAP_ALTS = ["KRW-ETH", "KRW-XRP", "KRW-SOL", "KRW-DOGE", "KRW-ADA",
-                 "KRW-TRX", "KRW-LINK", "KRW-AVAX", "KRW-SUI", "KRW-XLM"]
+TOP_MCAP_ALTS = ["KRW-XRP", "KRW-SOL", "KRW-TRX", "KRW-DOGE", "KRW-LINK",
+                 "KRW-XLM", "KRW-ADA", "KRW-BCH", "KRW-HBAR", "KRW-AVAX",
+                 "KRW-SUI", "KRW-SHIB", "KRW-CRO", "KRW-UNI", "KRW-NEAR"]
 
 
 def load_universe(broker: UpbitBroker) -> list[str]:
-    """시총 상위 10 알트 ∩ 현재 유효 마켓 (BTC 제외 — 코어/신호용)."""
+    """시총 상위 15 알트 ∩ 현재 유효 마켓 (BTC·ETH 제외 — 코어 전담)."""
     valid = set(broker.list_krw_markets())
     return [s for s in TOP_MCAP_ALTS if s in valid]
 

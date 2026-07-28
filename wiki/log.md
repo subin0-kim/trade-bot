@@ -342,3 +342,11 @@
 - 근거: BTC 기준을 ETH에 무튜닝 이식해도 작동 (+199.7% ✓) — 일반화 증거, 추가 선택 없음
 - bot_coin: CORE_ASSETS, asset_regime(symbol) 일반화, 태그 "core" (구 btc_core 호환)
 - 드라이런: ETH 3/3 만장일치 21일째 → 코어 진입. 기존 BTC 코어 과체중은 다음 소등까지 관찰
+
+## [2026-07-28] ingest | 위성 유니버스 2차 개편 — ETH 제외 + 시총 15종
+
+- 사용자 지시. CoinGecko 시총 ∩ 업비트 상장, 제외규칙(코어/스테이블/신생/미상장) 적용
+- 15종: XRP SOL TRX DOGE LINK XLM ADA BCH HBAR AVAX SUI SHIB CRO UNI NEAR (5종 신규 수집)
+- 위성 +74.8→+198.3% (PF 2.2, 분할 ✓), 결합 +189.2%. 기여 분산 확인 (12/15 플러스, 1위 26%)
+- 생존 편향(현재 시총으로 과거 검증) 명시 — 전방 검증이 최종 판정, 분기 순위 갱신
+- 갱신: crypto-principle-strategies.md
