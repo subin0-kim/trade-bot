@@ -25,7 +25,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import os
 from datetime import date, datetime, timedelta
@@ -46,7 +45,6 @@ BOT_NAME = "bot-coin"
 DATA_DIR = Path(os.environ.get("TRADING_DATA_DIR", "data"))
 STATE_PATH = DATA_DIR / "state" / f"{BOT_NAME}.json"
 EVENTS_PATH = DATA_DIR / "events" / f"{BOT_NAME}.jsonl"
-UNIVERSE_PATH = DATA_DIR / "cache" / "upbit" / "universe.json"
 
 MAX_BREAKOUT_POSITIONS = 4
 SHOCK_THRESHOLD_PCT = 1.0
@@ -56,14 +54,17 @@ CORE_FRACTION = Decimal("0.5")   # 초록불 시 BTC 코어 홀드 비중 (검�
 BREAKOUT_MIN_BULL_AGE = 5        # 위성 진입은 초록불 5일차부터 (전환 직후 깜빡임 구간 패배 실측)
 FEE = Decimal("0.0005")
 
+# 알트 유니버스 = 시가총액 상위 10 (2026-07-28 사용자 지시, 백테스트 검증:
+# 위성 후반 -10.4→+5.0 ✓, MDD 33.3→16.1, PF 1.57→2.02 — 대형주는 가짜 돌파가 적다).
+# 시총 순위는 업비트 API에 없어 정적 고정 — 분기마다 수동 갱신할 것.
+TOP_MCAP_ALTS = ["KRW-ETH", "KRW-XRP", "KRW-SOL", "KRW-DOGE", "KRW-ADA",
+                 "KRW-TRX", "KRW-LINK", "KRW-AVAX", "KRW-SUI", "KRW-XLM"]
+
 
 def load_universe(broker: UpbitBroker) -> list[str]:
-    """백테스트 유니버스 ∩ 현재 유효 마켓 (BTC 제외 — 신호용)."""
+    """시총 상위 10 알트 ∩ 현재 유효 마켓 (BTC 제외 — 코어/신호용)."""
     valid = set(broker.list_krw_markets())
-    if UNIVERSE_PATH.exists():
-        saved = json.loads(UNIVERSE_PATH.read_text(encoding="utf-8"))
-        return [s for s in saved if s in valid and s != "KRW-BTC"]
-    return []
+    return [s for s in TOP_MCAP_ALTS if s in valid]
 
 
 def completed_240m(broker: UpbitBroker, symbol: str, count: int = 120):

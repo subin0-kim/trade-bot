@@ -318,3 +318,11 @@
 - 기각: btc_roc5 (분할 비일관), 지표 추가 조합 (분리력 없음)
 - bot_coin: btc_regime이 (레짐, 지속일) 반환, BREAKOUT_MIN_BULL_AGE=5 게이트
 - 갱신: crypto-principle-strategies.md
+
+## [2026-07-28] ingest | 알트 유니버스 축소 — 시총 상위 10종 채택
+
+- 사용자 지시로 거래대금 24종 → 시총 10종 비교 후 채택
+- 위성 단독 최초 분할 통과 (후 -10.4→+5.0), MDD 33.3→16.1, PF 1.57→2.02 — 대형주는 가짜 돌파 적음
+- ADA/TRX/LINK/AVAX/SUI 5분봉 2.6년 신규 수집. bot_coin TOP_MCAP_ALTS 정적 리스트 (분기 수동 갱신)
+- shock_follow 바스켓 구성 변화는 전방 검증 관찰 대상
+- 갱신: crypto-principle-strategies.md
