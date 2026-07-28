@@ -52,7 +52,7 @@ uv run python scripts/collect_minutes.py                   # 분봉 아카이브
 
 이벤트 스키마(`data/events/*.jsonl`): `entry`/`exit`(pnl, win, reasons)/`equity`(일별) — 대시보드·wiki ingest의 원천. 스키마 정의는 `scripts/emit_backtest_events.py` docstring.
 
-KIS 인증정보는 `D:/kis/config/kis_devlp.yaml` (repo 밖, 공식 샘플과 동일 포맷. `KIS_CONFIG_PATH`로 변경 가능). 토큰 캐시는 `D:/kis/config/tokens/`.
+KIS 인증정보는 `D:/kis/config/kis_devlp.yaml` (repo 밖, 공식 샘플과 동일 포맷. `KIS_CONFIG_PATH`로 변경 가능). 토큰 캐시는 설정 yaml 옆의 `tokens/` (또는 `KIS_TOKEN_CACHE_DIR`) — 경로 하드코딩 없음, 리눅스 서버 호환.
 업비트 인증정보는 `D:/upbit/config/upbit.yaml` (`UPBIT_CONFIG_PATH`로 변경 가능). **업비트는 모의투자 환경이 없으므로 DryRunBroker가 유일한 안전장치.**
 
 ### 환경 주의사항 (Windows + 한글 경로)

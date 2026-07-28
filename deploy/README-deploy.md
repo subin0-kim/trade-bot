@@ -27,7 +27,7 @@ sudo mv /tmp/kis_devlp.yaml /tmp/upbit.yaml /etc/trading/
 sudo chown -R trading:trading /etc/trading && sudo chmod 600 /etc/trading/*
 ```
 
-- KIS 토큰 캐시 경로가 로컬(D:/kis/config/tokens/)과 다르므로 첫 실행 시 자동 재발급됨
+- KIS 토큰 캐시는 설정 yaml 옆에 자동 생성됨 (`/etc/trading/tokens/`) — 첫 실행 시 재발급
 - **업비트 개발자센터에서 서버 공인 IP를 허용 IP에 등록할 것** (미등록 시 인증 실패)
 
 ## 3. systemd 타이머 등록

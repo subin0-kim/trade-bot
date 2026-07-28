@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -15,7 +16,16 @@ import requests
 
 from .config import KISSettings
 
-TOKEN_CACHE_DIR = Path("D:/kis/config/tokens")
+def _default_cache_dir(settings: KISSettings) -> Path:
+    """토큰 캐시 기본 경로 — OS 무관하게 동작하도록 우선순위 결정:
+    ① KIS_TOKEN_CACHE_DIR 환경변수 ② 설정 yaml 옆의 tokens/ ③ ~/.kis/tokens
+    (과거 하드코딩 D:/kis/config/tokens는 ②로 자연 대체 — yaml이 D:/kis/config에 있으므로)"""
+    env_dir = os.environ.get("KIS_TOKEN_CACHE_DIR")
+    if env_dir:
+        return Path(env_dir)
+    if settings.config_path is not None:
+        return settings.config_path.parent / "tokens"
+    return Path.home() / ".kis" / "tokens"
 
 
 class KISAuthError(Exception):
@@ -25,7 +35,7 @@ class KISAuthError(Exception):
 class TokenManager:
     def __init__(self, settings: KISSettings, cache_dir: Path | None = None):
         self.settings = settings
-        self._cache_dir = cache_dir or TOKEN_CACHE_DIR
+        self._cache_dir = cache_dir or _default_cache_dir(settings)
         self._cache_dir.mkdir(parents=True, exist_ok=True)
         # 환경+앱키별 캐시 분리 (실전/모의 토큰이 섞이지 않게)
         self._cache_file = self._cache_dir / f"token_{settings.env}_{settings.app_key[:8]}.json"

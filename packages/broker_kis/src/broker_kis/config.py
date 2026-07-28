@@ -27,6 +27,7 @@ class KISSettings:
     ws_url: str
     hts_id: str
     user_agent: str
+    config_path: Path | None = None  # 로드된 yaml 위치 — 토큰 캐시 기본 경로 유도용
 
     @property
     def is_paper(self) -> bool:
@@ -56,6 +57,7 @@ class KISSettings:
                 ws_url=cfg["ops"],
                 hts_id=cfg["my_htsid"],
                 user_agent=cfg["my_agent"],
+                config_path=config_path,
             )
         return cls(
             env=env,
@@ -67,4 +69,5 @@ class KISSettings:
             ws_url=cfg["vops"],
             hts_id=cfg["my_htsid"],
             user_agent=cfg["my_agent"],
+            config_path=config_path,
         )
