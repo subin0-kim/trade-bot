@@ -1,11 +1,11 @@
 """코인봇 — 사이클당 1회 실행 (권장: 시간당 1회, 작업 스케줄러).
 
-전략 (2026-07 검증 — 레짐은 앙상블 2/3 다수결):
-  1. btc_core: 레짐 초록불이면 예산 50%로 BTC 홀드, 꺼지면 청산
-     — 게이트 B&H +120.7%/MDD 30.8, 분할 전반 +75.0/후반 +26.1 ✓ (최강 구성)
-  2. bull_breakout: 초록불일 때 나머지 예산 50%로 알트 breakout_momo(240m) 위성 운용
-     — 단독은 분할 취약(자산곡선 분할 후반 음수)이라 위성으로 강등.
-       코어+위성 50:50 결합 +99.3%/MDD 23.6, 분할 전반 +91.6/후반 +4.0 ✓
+전략 (2026-07 검증 — 레짐은 앙상블 2/3 다수결 {ROC30>0, SuperTrend(10,3), MA10>MA30}):
+  1. core: BTC·ETH 각자 자체 앙상블이 초록불이면 예산 25%씩 홀드, 꺼지면 청산
+     — BTC 신호를 ETH에 튜닝 없이 이식해도 작동 (일반화 증거).
+       결합 +100.1→+118.7%/MDD 21.7, 분할 전반 +66.4/후반 +31.5 ✓
+  2. bull_breakout: BTC 초록불 5일차부터 나머지 예산 50%로 알트 breakout_momo(240m) 위성
+     — 단독은 분할 취약이라 위성으로 강등. 유니버스 = 시총 상위 10
   3. shock_follow: BTC 09~10시 |수익률|≥1% → 10시대에 알트 바스켓 매수 → 익일 09시 청산
      — 분할 전반 +0.84%/후반 +0.68% per 이벤트일
 
@@ -50,7 +50,8 @@ MAX_BREAKOUT_POSITIONS = 4
 SHOCK_THRESHOLD_PCT = 1.0
 SHOCK_BASKET_N = 10          # 쇼크 이벤트 시 매수할 알트 수 (24h 거래대금 상위)
 SURGE_SKIP_PCT = 20.0        # 전일 급등 진입 금지 임계
-CORE_FRACTION = Decimal("0.5")   # 초록불 시 BTC 코어 홀드 비중 (검증: 50:50 결합 ✓)
+CORE_FRACTION = Decimal("0.5")   # 코어 홀드 총 비중 (검증: 50:50 결합 ✓)
+CORE_ASSETS = ["KRW-BTC", "KRW-ETH"]  # 각자 자체 앙상블 게이트, 예산 균등 분할 (25%씩)
 BREAKOUT_MIN_BULL_AGE = 5        # 위성 진입은 초록불 5일차부터 (전환 직후 깜빡임 구간 패배 실측)
 FEE = Decimal("0.0005")
 
@@ -74,20 +75,20 @@ def completed_240m(broker: UpbitBroker, symbol: str, count: int = 120):
     return [b for b in bars if b.ts + timedelta(minutes=240) <= now]
 
 
-def btc_regime(broker: UpbitBroker) -> tuple[str, int]:
-    """BTC 일봉 앙상블 레짐 — {ROC30>0, SuperTrend(10,3), MA10>MA30} 2/3 다수결.
+def asset_regime(broker: UpbitBroker, symbol: str) -> tuple[str, int]:
+    """자산 일봉 앙상블 레짐 — {ROC30>0, SuperTrend(10,3), MA10>MA30} 2/3 다수결.
 
-    반환: (레짐, 초록불 연속일수). 위성(돌파) 진입은 5일차부터만 —
-    전환 직후 깜빡임 구간의 패배 실측 (bull_age<5: 승률 25.5%/평균 -1.75%).
+    반환: (레짐, 초록불 연속일수). BTC 레짐이 위성/쇼크의 신호이고,
+    코어는 자산별 자체 레짐으로 게이트한다 (BTC 기준을 ETH에 튜닝 없이 이식 — 일반화 검증 ✓).
+    위성(돌파) 진입은 BTC 초록불 5일차부터만 — 전환 직후 깜빡임 구간 패배 실측.
 
     2026-07 기준 심사: 3개 강건 가족의 다수결이 '가장 나쁜 반쪽' 최고
-    (BTC 코어 +120.7%, 전반 +75/후반 +26 ✓ — wiki/crypto-condition-switching).
-    단일 기준(MA10/30/60 정배열)은 후반 취약으로 교체됨.
+    (wiki/crypto-regime-findings). 단일 기준(MA10/30/60 정배열)은 후반 취약으로 교체됨.
 
     주의: 업비트 일봉 경계 09:00 KST vs 백테스트 자정 경계 — 전방 검증 관찰 대상.
     """
     daily = broker.get_daily_candles(
-        "KRW-BTC", date.today() - timedelta(days=150), date.today()
+        symbol, date.today() - timedelta(days=150), date.today()
     )
     done = [c for c in daily if c.ts.date() < date.today()]
     xs = closes(done)
@@ -109,7 +110,8 @@ def btc_regime(broker: UpbitBroker) -> tuple[str, int]:
         if not f:
             break
         bull_age += 1
-    logger.info("레짐 투표: ROC30 %s, SuperTrend %s, MA10>30 %s | 초록불 %d일째",
+    logger.info("%s 레짐 투표: ROC30 %s, SuperTrend %s, MA10>30 %s | 초록불 %d일째",
+                symbol.replace("KRW-", ""),
                 "○" if (r30[-1] or 0) > 0 else "×",
                 "○" if st[-1] == 1 else "×",
                 "○" if (ma10[-1] or 0) > (ma30[-1] or 1) else "×", bull_age)
@@ -205,7 +207,8 @@ def main():
     logger.info("코인봇 [%s] 현금 %s원, 보유 %d종목", mode, state.cash, len(state.positions))
 
     universe = load_universe(broker)
-    regime, bull_age = btc_regime(broker)
+    regimes = {sym: asset_regime(broker, sym) for sym in CORE_ASSETS}
+    regime, bull_age = regimes["KRW-BTC"]  # BTC 레짐 = 위성/쇼크의 신호
     logger.info("BTC 레짐: %s (%d일째) | 유니버스 %d종목", regime.upper(), bull_age, len(universe))
 
     breakout = build_preset("breakout_momo")
@@ -217,10 +220,11 @@ def main():
             if pos.exit_due and now >= datetime.fromisoformat(pos.exit_due):
                 place_sell(broker, state, events, pos, "쇼크 익일 09시 청산", args.live)
             continue
-        if pos.strategy == "btc_core":
-            # 코어는 돌파 규칙이 아니라 레짐 신호로만 청산
-            if regime != "bull":
-                place_sell(broker, state, events, pos, f"레짐 이탈({regime}) — 코어 청산", args.live)
+        if pos.strategy in ("btc_core", "core"):
+            # 코어는 돌파 규칙이 아니라 해당 자산의 자체 레짐 신호로만 청산
+            r, _ = regimes.get(pos.symbol) or asset_regime(broker, pos.symbol)
+            if r != "bull":
+                place_sell(broker, state, events, pos, f"레짐 이탈({r}) — 코어 청산", args.live)
             continue
         # bull_breakout: 완성 240m 봉으로 전략 청산 규칙 평가
         bars = completed_240m(broker, symbol, 200)
@@ -243,12 +247,15 @@ def main():
         elif regime != "bull":
             place_sell(broker, state, events, pos, f"레짐 이탈({regime}) — 현금화", args.live)
 
-    # ---------- 2) BTC 코어 홀드 (btc_core) ----------
-    if regime == "bull" and "KRW-BTC" not in state.positions:
-        core_amount = min(Decimal(args.budget) * CORE_FRACTION,
-                          Decimal(state.cash) * Decimal("0.95"))
-        place_buy(broker, state, events, "KRW-BTC", core_amount, "btc_core",
-                  ["레짐 초록불(앙상블 2/3) — 코어 홀드 진입"], args.live)
+    # ---------- 2) 코어 홀드 (BTC·ETH 각자 자체 레짐 게이트) ----------
+    core_each = Decimal(args.budget) * CORE_FRACTION / len(CORE_ASSETS)
+    for sym in CORE_ASSETS:
+        r, _ = regimes[sym]
+        if r == "bull" and sym not in state.positions:
+            amount = min(core_each, Decimal(state.cash) * Decimal("0.95"))
+            place_buy(broker, state, events, sym, amount, "core",
+                      [f"{sym.replace('KRW-', '')} 자체 앙상블 초록불 — 코어 홀드 진입"],
+                      args.live)
 
     # ---------- 3) 쇼크 이벤트 (btc_shock_alt_follow) ----------
     today_str = date.today().isoformat()
