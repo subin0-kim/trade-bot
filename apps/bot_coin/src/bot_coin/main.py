@@ -153,17 +153,19 @@ def place_buy(broker, state, events, symbol, krw_amount, strategy_tag, reasons, 
     if qty * quote.price < 5000:
         return False
     entry_price = quote.price
+    paid_fee = None
     if live:
         order = broker.place_order(OrderRequest(
             symbol=symbol, side=OrderSide.BUY, quantity=qty, order_type=OrderType.MARKET,
         ))
-        filled, avg = broker.settle_order(order)
+        filled, avg, paid_fee = broker.settle_order(order)
         if filled <= 0:
             logger.error("⚠️ %s 매수 미체결 (주문 %s) — 원장 기록 없음", symbol, order.order_id)
             return False
         qty, entry_price = filled, (avg or quote.price)  # 실체결 기준으로 원장 기록
     cost = entry_price * qty
-    state.cash = str(Decimal(state.cash) - cost * (1 + FEE))
+    fee = paid_fee if (live and paid_fee is not None) else cost * FEE  # 라이브=실수수료
+    state.cash = str(Decimal(state.cash) - cost - fee)
     state.positions[symbol] = CoinPosition(
         symbol=symbol, quantity=str(qty), entry_price=str(entry_price),
         entry_ts=datetime.now().isoformat(), strategy=strategy_tag,
@@ -183,11 +185,12 @@ def place_sell(broker, state, events, pos: CoinPosition, reason, live):
     qty = Decimal(pos.quantity)
     exit_price = quote.price
     partial = False
+    paid_fee = None
     if live:
         order = broker.place_order(OrderRequest(
             symbol=pos.symbol, side=OrderSide.SELL, quantity=qty, order_type=OrderType.MARKET,
         ))
-        filled, avg = broker.settle_order(order)
+        filled, avg, paid_fee = broker.settle_order(order)
         if filled <= 0:
             logger.error("⚠️ %s 매도 미체결 (주문 %s) — 포지션 유지, 다음 사이클 재시도",
                          pos.symbol, order.order_id)
@@ -198,7 +201,9 @@ def place_sell(broker, state, events, pos: CoinPosition, reason, live):
             pos.quantity = str(qty - filled)
             qty = filled
             partial = True
-    proceeds = exit_price * qty * (1 - FEE)
+    gross = exit_price * qty
+    sell_fee = paid_fee if (live and paid_fee is not None) else gross * FEE  # 라이브=실수수료
+    proceeds = gross - sell_fee
     cost = Decimal(pos.entry_price) * qty
     pnl = proceeds - cost
     state.cash = str(Decimal(state.cash) + proceeds)

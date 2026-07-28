@@ -80,3 +80,10 @@ DryRunBroker(로컬 모의체결)가 KIS보다 훨씬 중요하며, `--live` 게
   query_hash 포함). 빠뜨리면 401 "Please check Authorization Header" (404가 아님!).
 - 체결 확인: `trades[]`의 funds/volume 가중평균이 실체결가. `state`: wait/done/cancel.
   시장가는 보통 즉시 done. 그룹은 default(30/s) — order 그룹(8/s) 아님.
+
+## 실수수료 반영 (paid_fee) — 상수 가정 대신 실제값 (2026-07-28)
+
+- 주문 단건 조회 응답의 `paid_fee` = 업비트가 실제 차감한 KRW 수수료.
+  라이브 원장은 상수(0.05%) 가정이 아니라 이 값으로 현금 계산 — 수수료 이벤트·등급에 안전.
+- KIS는 주문 조회에 수수료 없음 (계좌 단위 정산) → 근사치 0.21%(수수료+거래세) 유지.
+  settle_order 시그니처는 (수량, 평균가, 수수료|None)로 양 브로커 통일.

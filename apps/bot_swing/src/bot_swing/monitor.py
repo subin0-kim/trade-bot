@@ -75,7 +75,7 @@ def check_once(broker: KISBroker, threshold_pct: float, live: bool) -> int:
                 symbol=symbol, side=OrderSide.SELL,
                 quantity=Decimal(held.quantity), order_type=OrderType.MARKET,
             ))
-            filled, avg = broker.settle_order(order)
+            filled, avg, _ = broker.settle_order(order)
             if filled <= 0:
                 logger.error("⚠️ %s 긴급손절 미체결 (주문 %s) — 다음 점검 재시도", symbol, order.order_id)
                 continue

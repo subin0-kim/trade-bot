@@ -342,15 +342,19 @@ class KISBroker:
         )
 
     def settle_order(self, order: Order, timeout: float = 20.0
-                     ) -> tuple[Decimal, Decimal | None]:
-        """주문 확정: 체결 대기 → 미체결이면 취소 → 최종 체결분 반환.
+                     ) -> tuple[Decimal, Decimal | None, None]:
+        """주문 확정: 체결 대기 → 미체결이면 취소 → 최종 (수량, 평균가, None) 반환.
+
+        수수료 자리는 항상 None — KIS는 주문 조회에 수수료가 없다 (계좌 단위 정산).
+        호출부는 근사치(수수료+거래세 0.21%)를 사용한다. 업비트 settle_order와
+        시그니처를 맞춰 봇 코드가 브로커를 가리지 않게 한다.
 
         취소-체결 경합 대비 취소 후 재조회. 미체결 잔량은 취소되므로
         다음 사이클이 새 주문으로 재시도하면 된다 (수량 잠김 없음).
         """
         filled, avg = self.wait_fill(order.order_id, timeout=timeout)
         if filled > 0 and avg is not None:
-            return filled, avg
+            return filled, avg, None
         try:
             self.cancel_order(order)
         except Exception:
@@ -359,7 +363,7 @@ class KISBroker:
             filled, avg = self.get_order_fill(order.order_id)
         except Exception:
             pass
-        return filled, avg
+        return filled, avg, None
 
     def wait_fill(self, odno: str, timeout: float = 20.0, interval: float = 2.0
                   ) -> tuple[Decimal, Decimal | None]:

@@ -236,59 +236,64 @@ class UpbitBroker:
             meta={"ord_type": params["ord_type"]},
         )
 
-    def get_order_fill(self, uuid: str) -> tuple[str, Decimal, Decimal | None]:
-        """(상태, 체결수량, 평균체결가). trades의 체결금액/수량 가중평균."""
+    def get_order_fill(self, uuid: str) -> tuple[str, Decimal, Decimal | None, Decimal]:
+        """(상태, 체결수량, 평균체결가, 실납부수수료). trades의 체결금액/수량 가중평균.
+
+        paid_fee는 업비트가 실제로 차감한 KRW 수수료 — 상수 가정 대신 이 값으로
+        원장 현금을 계산해야 정확하다 (수수료 이벤트·등급 변동에도 안전).
+        """
         data = self.client.get("/v1/order", {"uuid": uuid}, group="default", auth=True)
         vol = Decimal(data.get("executed_volume") or "0")
+        fee = Decimal(data.get("paid_fee") or "0")
         avg = None
         trades = data.get("trades") or []
         if trades:
             funds = sum(Decimal(t["funds"]) for t in trades)
             tvol = sum(Decimal(t["volume"]) for t in trades)
             avg = funds / tvol if tvol > 0 else None
-        return data.get("state", ""), vol, avg
+        return data.get("state", ""), vol, avg, fee
 
     def cancel_order(self, uuid: str) -> None:
         """미체결 주문 취소 (DELETE /v1/order). 이미 체결/취소면 에러 — 호출부가 무시."""
         self.client.delete("/v1/order", {"uuid": uuid})
 
     def settle_order(self, order: Order, timeout: float = 15.0
-                     ) -> tuple[Decimal, Decimal | None]:
-        """주문 확정: 체결 대기 → 미체결이면 취소 → 최종 체결분 반환.
+                     ) -> tuple[Decimal, Decimal | None, Decimal | None]:
+        """주문 확정: 체결 대기 → 미체결이면 취소 → 최종 (수량, 평균가, 실수수료) 반환.
 
         취소 요청과 체결이 경합할 수 있으므로 취소 후 반드시 재조회 —
-        반환된 (수량, 평균가)가 원장에 기록할 최종 진실이다.
-        미체결 잔량은 취소되므로 다음 사이클이 새 주문으로 재시도하면 된다 (잔고 잠김 없음).
+        반환값이 원장에 기록할 최종 진실이다. 미체결 잔량은 취소되므로
+        다음 사이클이 새 주문으로 재시도하면 된다 (잔고 잠김 없음).
         """
-        filled, avg = self.wait_fill(order.order_id, timeout=timeout)
+        filled, avg, fee = self.wait_fill(order.order_id, timeout=timeout)
         if filled > 0 and avg is not None:
-            return filled, avg
+            return filled, avg, fee
         try:
             self.cancel_order(order.order_id)
         except UpbitApiError:
             pass  # 이미 done/cancel — 아래 재조회가 진실
         try:
-            _, filled, avg = self.get_order_fill(order.order_id)
+            _, filled, avg, fee = self.get_order_fill(order.order_id)
         except UpbitApiError:
             pass
-        return filled, avg
+        return filled, avg, fee
 
     def wait_fill(self, uuid: str, timeout: float = 15.0, interval: float = 1.0
-                  ) -> tuple[Decimal, Decimal | None]:
-        """체결 확인 폴링 — (체결수량, 평균체결가). 시장가는 보통 즉시 done."""
+                  ) -> tuple[Decimal, Decimal | None, Decimal]:
+        """체결 확인 폴링 — (체결수량, 평균체결가, 실수수료). 시장가는 보통 즉시 done."""
         from time import monotonic, sleep
 
         deadline = monotonic() + timeout
-        vol, avg = Decimal(0), None
+        vol, avg, fee = Decimal(0), None, Decimal(0)
         while True:
             try:
-                state, vol, avg = self.get_order_fill(uuid)
+                state, vol, avg, fee = self.get_order_fill(uuid)
                 if state in ("done", "cancel"):
-                    return vol, avg
+                    return vol, avg, fee
             except Exception:
                 pass
             if monotonic() > deadline:
-                return vol, avg
+                return vol, avg, fee
             sleep(interval)
 
     def cancel_order(self, order: Order) -> None:
