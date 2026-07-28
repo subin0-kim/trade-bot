@@ -326,6 +326,41 @@ class KISBroker:
                 return qty, (amt / qty if qty > 0 else None)
         return Decimal(0), None
 
+    def cancel_order(self, order: Order) -> None:
+        """미체결 주문 전량 취소 (TTTC0013U/VTTC0013U). 이미 체결이면 에러 — 호출부가 무시."""
+        tr_id = "VTTC0013U" if self.settings.is_paper else "TTTC0013U"
+        self.client.post(
+            "/uapi/domestic-stock/v1/trading/order-rvsecncl", tr_id,
+            {
+                "CANO": self.settings.account, "ACNT_PRDT_CD": self.settings.product,
+                "KRX_FWDG_ORD_ORGNO": order.meta.get("krx_fwdg_ord_orgno", ""),
+                "ORGN_ODNO": order.order_id, "ORD_DVSN": "01",
+                "RVSE_CNCL_DVSN_CD": "02",  # 02: 취소
+                "ORD_QTY": "0", "ORD_UNPR": "0", "QTY_ALL_ORD_YN": "Y",
+                "EXCG_ID_DVSN_CD": "KRX",
+            },
+        )
+
+    def settle_order(self, order: Order, timeout: float = 20.0
+                     ) -> tuple[Decimal, Decimal | None]:
+        """주문 확정: 체결 대기 → 미체결이면 취소 → 최종 체결분 반환.
+
+        취소-체결 경합 대비 취소 후 재조회. 미체결 잔량은 취소되므로
+        다음 사이클이 새 주문으로 재시도하면 된다 (수량 잠김 없음).
+        """
+        filled, avg = self.wait_fill(order.order_id, timeout=timeout)
+        if filled > 0 and avg is not None:
+            return filled, avg
+        try:
+            self.cancel_order(order)
+        except Exception:
+            pass  # 이미 체결/취소 — 아래 재조회가 진실
+        try:
+            filled, avg = self.get_order_fill(order.order_id)
+        except Exception:
+            pass
+        return filled, avg
+
     def wait_fill(self, odno: str, timeout: float = 20.0, interval: float = 2.0
                   ) -> tuple[Decimal, Decimal | None]:
         """체결 확인 폴링 — (체결수량, 평균체결가). 장중 시장가는 보통 1~2회 안에 확정."""

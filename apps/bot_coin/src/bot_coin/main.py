@@ -157,7 +157,7 @@ def place_buy(broker, state, events, symbol, krw_amount, strategy_tag, reasons, 
         order = broker.place_order(OrderRequest(
             symbol=symbol, side=OrderSide.BUY, quantity=qty, order_type=OrderType.MARKET,
         ))
-        filled, avg = broker.wait_fill(order.order_id)
+        filled, avg = broker.settle_order(order)
         if filled <= 0:
             logger.error("⚠️ %s 매수 미체결 (주문 %s) — 원장 기록 없음", symbol, order.order_id)
             return False
@@ -187,7 +187,7 @@ def place_sell(broker, state, events, pos: CoinPosition, reason, live):
         order = broker.place_order(OrderRequest(
             symbol=pos.symbol, side=OrderSide.SELL, quantity=qty, order_type=OrderType.MARKET,
         ))
-        filled, avg = broker.wait_fill(order.order_id)
+        filled, avg = broker.settle_order(order)
         if filled <= 0:
             logger.error("⚠️ %s 매도 미체결 (주문 %s) — 포지션 유지, 다음 사이클 재시도",
                          pos.symbol, order.order_id)

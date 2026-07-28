@@ -248,6 +248,31 @@ class UpbitBroker:
             avg = funds / tvol if tvol > 0 else None
         return data.get("state", ""), vol, avg
 
+    def cancel_order(self, uuid: str) -> None:
+        """미체결 주문 취소 (DELETE /v1/order). 이미 체결/취소면 에러 — 호출부가 무시."""
+        self.client.delete("/v1/order", {"uuid": uuid})
+
+    def settle_order(self, order: Order, timeout: float = 15.0
+                     ) -> tuple[Decimal, Decimal | None]:
+        """주문 확정: 체결 대기 → 미체결이면 취소 → 최종 체결분 반환.
+
+        취소 요청과 체결이 경합할 수 있으므로 취소 후 반드시 재조회 —
+        반환된 (수량, 평균가)가 원장에 기록할 최종 진실이다.
+        미체결 잔량은 취소되므로 다음 사이클이 새 주문으로 재시도하면 된다 (잔고 잠김 없음).
+        """
+        filled, avg = self.wait_fill(order.order_id, timeout=timeout)
+        if filled > 0 and avg is not None:
+            return filled, avg
+        try:
+            self.cancel_order(order.order_id)
+        except UpbitApiError:
+            pass  # 이미 done/cancel — 아래 재조회가 진실
+        try:
+            _, filled, avg = self.get_order_fill(order.order_id)
+        except UpbitApiError:
+            pass
+        return filled, avg
+
     def wait_fill(self, uuid: str, timeout: float = 15.0, interval: float = 1.0
                   ) -> tuple[Decimal, Decimal | None]:
         """체결 확인 폴링 — (체결수량, 평균체결가). 시장가는 보통 즉시 done."""
