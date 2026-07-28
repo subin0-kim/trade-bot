@@ -94,7 +94,7 @@ def portfolio_curve(series_states, data) -> dict[date, float]:
     pbt = PortfolioBacktester(
         strat, max_positions=8, warmup=300, view_window=400,
         fee_rate=COIN_FEE, sell_tax_rate=COIN_TAX, slippage_rate=COIN_SLIPPAGE,
-        initial_cash=Decimal(50_000_000),
+        initial_cash=Decimal(50_000_000), quantity_step=Decimal("0.00000001"),
     )
     result = pbt.run(data)
     s = result.summary()

@@ -326,3 +326,11 @@
 - ADA/TRX/LINK/AVAX/SUI 5분봉 2.6년 신규 수집. bot_coin TOP_MCAP_ALTS 정적 리스트 (분기 수동 갱신)
 - shock_follow 바스켓 구성 변화는 전방 검증 관찰 대상
 - 갱신: crypto-principle-strategies.md
+
+## [2026-07-28] ingest | 포트폴리오 엔진 수량 절사 버그 수정 + BTC/ETH 위성 편입 실측
+
+- 버그: 슬롯 상한 int() 절사 + MarketView quantity_step 미전달 → BTC(1개>슬롯예산) 체결 불가
+- 수정: PortfolioBacktester quantity_step 파라미터 (주식 회귀 +44.43%/147건 동일)
+- 코인 수치 보정: 위성 +72.7%/PF 1.96 (분할 ✓ 유지), 결합 +100.1% — 결론 불변
+- BTC 위성 편입 실측: 코어와 중복이라 오히려 손해 (-5%p) / BTC+ETH만은 노출 3.4%로 실격
+- 결론: 돌파 위성 = 알트 10종, BTC = 코어 전담 (역할 분리)

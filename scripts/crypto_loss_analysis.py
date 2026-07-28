@@ -110,7 +110,8 @@ def main():
     strat = RegimeMappedStrategy("ens", states, {"bull": build_preset("breakout_momo"), "off": None})
     pbt = PortfolioBacktester(strat, max_positions=8, warmup=300, view_window=400,
                               fee_rate=COIN_FEE, sell_tax_rate=COIN_TAX,
-                              slippage_rate=COIN_SLIPPAGE, initial_cash=Decimal(50_000_000))
+                              slippage_rate=COIN_SLIPPAGE, initial_cash=Decimal(50_000_000),
+                              quantity_step=Decimal("0.00000001"))
     result = pbt.run(data)
     closed = [t for t in result.trades if t.exit_ts is not None]
 

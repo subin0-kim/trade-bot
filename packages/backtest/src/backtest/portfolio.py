@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from decimal import Decimal
+from decimal import ROUND_DOWN, Decimal
 
 from strategy_kit import CompositeStrategy, MarketView, OpenPosition
 from trading_core.models import Candle, OrderSide
@@ -83,6 +83,7 @@ class PortfolioBacktester:
         slippage_rate: Decimal = Decimal("0.0005"),
         warmup: int = 130,
         view_window: int = 320,
+        quantity_step: Decimal = Decimal(1),
     ):
         self.strategy = strategy
         self.primary_tf = primary_tf
@@ -94,6 +95,7 @@ class PortfolioBacktester:
         self.slippage_rate = slippage_rate
         self.warmup = warmup
         self.view_window = view_window
+        self.quantity_step = quantity_step  # 주식 1주, 코인 1e-8 — 슬롯 상한 절사 단위
 
     def run(self, data: dict[str, list[Candle]]) -> PortfolioResult:
         states: dict[str, _SymbolState] = {}
@@ -139,10 +141,12 @@ class PortfolioBacktester:
                     fill = bar.open * (1 + self.slippage_rate)
                     # 분산 강제: 종목당 자산/max_positions 상한
                     cap = equity_at(d) / self.max_positions
-                    qty = min(pending["quantity"], Decimal(int(cap / fill)))
+                    cap_qty = ((cap / fill) / self.quantity_step).to_integral_value(
+                        rounding=ROUND_DOWN) * self.quantity_step
+                    qty = min(pending["quantity"], cap_qty)
                     cost = fill * qty
                     fee = cost * self.fee_rate
-                    if qty >= 1 and cost + fee <= cash:
+                    if qty > 0 and cost + fee <= cash:
                         cash -= cost + fee
                         st.position = OpenPosition(
                             side=OrderSide.BUY, quantity=qty,
@@ -192,6 +196,7 @@ class PortfolioBacktester:
                             for tf, (bars, counts) in st.higher.items()
                         },
                     },
+                    quantity_step=self.quantity_step,
                 )
                 decision = self.strategy.evaluate(view, st.position, equity_at(d))
                 if decision.action == "exit" and st.position is not None:
