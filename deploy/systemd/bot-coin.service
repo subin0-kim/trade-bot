@@ -10,5 +10,7 @@ WorkingDirectory=/opt/stock-trade-bot
 Environment=TZ=Asia/Seoul
 Environment=UPBIT_CONFIG_PATH=/etc/trading/upbit.yaml
 Environment=KIS_CONFIG_PATH=/etc/trading/kis_devlp.yaml
-ExecStart=/bin/bash -lc 'uv run bot-coin && uv run dashboard-build'
+# --budget은 봇 예산 상한(원). ⚠️ 첫 실행 때 원장(data/state)이 이 값으로 생성되며,
+# 이후 변경은 state 파일의 cash를 직접 수정해야 한다 (--budget만 바꿔선 반영 안 됨)
+ExecStart=/bin/bash -lc 'uv run bot-coin --budget 10000000 && uv run dashboard-build'
 TimeoutStartSec=600
