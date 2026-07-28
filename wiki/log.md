@@ -390,3 +390,13 @@
   - live 기동 시 계좌 주문가능 KRW < 원장 현금이면 경고
   - entry/exit 이벤트에 mode(LIVE/DRY-RUN) 태깅 — 전방 검증 기록과 실전 기록 구분
 - deploy: bot-coin.service --live --yes 반영, README-deploy.md에 전환 절차(3.5절) 추가
+
+## [2026-07-28] ingest | 코인봇 실전(LIVE) 가동 개시 — Vultr 서버 배포
+
+- 서버: Vultr VM (Ubuntu 26.04, KST, systemd 타이머 4종), 코드는 /opt/stock-trade-bot (GitHub pull)
+- 가동 전 검증: 인증(조회) → 주문 권한(체결 불가 지정가 5,500원 + 즉시 취소) → 예산 입금 대기
+  → 첫 live 사이클 수동 실행 → 원장-실계좌 대조 (ETH 정확 일치, BTC 봇 몫 분리, KRW 정합)
+- 첫 사이클(22:18 KST): BTC 앙상블 2/3 초록불 5일째, ETH 3/3 21일째 → 코어 진입
+  BTC 0.02708089 @ 92,316,000 + ETH 0.90876045 @ 2,751,000 (각 250만, 실수수료 2,500원)
+- 예산 1,000만원 (계좌 여유 5.9만), 스윙봇은 dry-run 유지
+- 발견 quirk: 주문권한 테스트 중 get_open_orders 401 → JWT query_hash unquote 수정 (upbit-api-notes)
