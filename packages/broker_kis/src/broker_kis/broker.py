@@ -380,22 +380,3 @@ class KISBroker:
             if qty > 0 or monotonic() > deadline:
                 return qty, avg
             sleep(interval)
-
-    def cancel_order(self, order: Order) -> None:
-        """전량 취소."""
-        self.client.post(
-            "/uapi/domestic-stock/v1/trading/order-rvsecncl",
-            "TTTC0013U",
-            {
-                "CANO": self.settings.account,
-                "ACNT_PRDT_CD": self.settings.product,
-                "KRX_FWDG_ORD_ORGNO": order.meta.get("krx_fwdg_ord_orgno", ""),
-                "ORGN_ODNO": order.order_id,
-                "ORD_DVSN": "00",
-                "RVSE_CNCL_DVSN_CD": "02",  # 01 정정 / 02 취소
-                "ORD_QTY": "0",
-                "ORD_UNPR": "0",
-                "QTY_ALL_ORD_YN": "Y",
-                "EXCG_ID_DVSN_CD": "KRX",
-            },
-        )

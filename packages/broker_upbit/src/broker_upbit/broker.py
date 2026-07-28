@@ -13,6 +13,8 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
+import requests
+
 from trading_core.models import (
     Balance,
     Candle,
@@ -26,7 +28,7 @@ from trading_core.models import (
     Quote,
 )
 
-from .client import UpbitClient
+from .client import UpbitApiError, UpbitClient
 from .config import UpbitSettings
 
 # KRW 마켓 호가단위 (가격 구간별) — 지정가 주문 시 이 단위로 맞춰야 한다
@@ -253,9 +255,9 @@ class UpbitBroker:
             avg = funds / tvol if tvol > 0 else None
         return data.get("state", ""), vol, avg, fee
 
-    def cancel_order(self, uuid: str) -> None:
+    def cancel_order(self, order: Order) -> None:
         """미체결 주문 취소 (DELETE /v1/order). 이미 체결/취소면 에러 — 호출부가 무시."""
-        self.client.delete("/v1/order", {"uuid": uuid})
+        self.client.delete("/v1/order", {"uuid": order.order_id})
 
     def settle_order(self, order: Order, timeout: float = 15.0
                      ) -> tuple[Decimal, Decimal | None, Decimal | None]:
@@ -269,12 +271,12 @@ class UpbitBroker:
         if filled > 0 and avg is not None:
             return filled, avg, fee
         try:
-            self.cancel_order(order.order_id)
-        except UpbitApiError:
-            pass  # 이미 done/cancel — 아래 재조회가 진실
+            self.cancel_order(order)
+        except (UpbitApiError, requests.RequestException):
+            pass  # 이미 done/cancel이거나 네트워크 실패 — 아래 재조회가 진실
         try:
             _, filled, avg, fee = self.get_order_fill(order.order_id)
-        except UpbitApiError:
+        except (UpbitApiError, requests.RequestException):
             pass
         return filled, avg, fee
 
@@ -295,9 +297,6 @@ class UpbitBroker:
             if monotonic() > deadline:
                 return vol, avg, fee
             sleep(interval)
-
-    def cancel_order(self, order: Order) -> None:
-        self.client.delete("/v1/order", {"uuid": order.order_id})
 
     # ------------------------------------------------------------------ 확장
     def list_krw_markets(self) -> list[str]:
