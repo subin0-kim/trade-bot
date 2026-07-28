@@ -91,30 +91,40 @@ journalctl -u bot-coin.service -n 50
 수동으로 1사이클씩 돌리거나 업비트 앱에서 직접 매도 후 원장(state 파일)에서 해당
 포지션을 제거한다 (원장에 남겨두면 봇이 이미 없는 코인을 팔려고 시도한다).
 
-## 4. 대시보드 접근 (Tailscale — 포트 개방 없음)
+## 4. 대시보드 접근 (Tailscale + 비밀번호 — 포트 개방 없음)
 
 ```bash
 curl -fsSL https://tailscale.com/install.sh | sh
 sudo tailscale up                      # 브라우저로 로그인 승인
-# 정적 파일 서빙 (tailnet 안에서만 접근 가능)
-sudo tee /etc/systemd/system/dashboard-serve.service <<'EOF'
-[Unit]
-Description=대시보드 정적 서빙 (tailnet 전용)
-[Service]
-User=trading
-WorkingDirectory=/opt/stock-trade-bot/data/reports
-ExecStart=/usr/bin/python3 -m http.server 8080 --bind 0.0.0.0
-Restart=always
-[Install]
-WantedBy=multi-user.target
+TSIP=$(tailscale ip -4)
+
+# nginx + Basic Auth (비밀번호는 안전한 곳에 보관)
+sudo apt-get install -y nginx apache2-utils
+sudo rm -f /etc/nginx/sites-enabled/default          # 공개 80 포트 기본 사이트 제거
+sudo htpasswd -cB /etc/nginx/.htpasswd-dashboard <아이디>
+sudo tee /etc/nginx/sites-available/dashboard <<EOF
+# listen이 tailnet IP라 공인망에서는 접속 자체가 불가 (ufw 없이도 안전)
+server {
+    listen ${TSIP}:8080;
+    root /opt/stock-trade-bot/data/reports;
+    index dashboard.html;
+    auth_basic "Trading Dashboard";
+    auth_basic_user_file /etc/nginx/.htpasswd-dashboard;
+    location / { try_files \$uri \$uri/ =404; add_header Cache-Control "no-store"; }
+}
 EOF
-sudo systemctl enable --now dashboard-serve
-# 방화벽: tailscale0 인터페이스만 8080 허용 (공인망 차단)
-sudo ufw allow in on tailscale0 to any port 8080
-sudo ufw deny 8080
+sudo ln -sf /etc/nginx/sites-available/dashboard /etc/nginx/sites-enabled/
+# 부팅 시 tailscaled → nginx 순서 보장 (tailnet IP 바인딩 실패 방지)
+sudo mkdir -p /etc/systemd/system/nginx.service.d
+printf '[Unit]\nAfter=tailscaled.service\nWants=tailscaled.service\n\n[Service]\nRestart=on-failure\nRestartSec=5\n' \
+  | sudo tee /etc/systemd/system/nginx.service.d/tailscale-order.conf
+sudo systemctl daemon-reload && sudo nginx -t && sudo systemctl enable --now nginx
+
+# 검증: 401(비밀번호 없이) / 200(비밀번호) / 공인 IP는 연결 거부
+curl -s -o /dev/null -w "%{http_code}\n" http://${TSIP}:8080/
 ```
 
-폰/노트북에 Tailscale 앱 설치 후 `http://<서버 tailnet IP>:8080/dashboard.html`
+폰/노트북에 Tailscale 앱 설치(같은 계정 로그인) 후 `http://<서버 tailnet IP>:8080/` — 아이디/비밀번호 입력
 
 ## 5. 운영
 
