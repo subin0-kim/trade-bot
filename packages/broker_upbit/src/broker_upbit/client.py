@@ -17,7 +17,7 @@ import hashlib
 import time
 import uuid
 import warnings
-from urllib.parse import urlencode
+from urllib.parse import unquote, urlencode
 
 import jwt
 import requests
@@ -63,8 +63,10 @@ class UpbitClient:
             "nonce": str(uuid.uuid4()),
         }
         if params:
-            # 배열 파라미터는 states[]=wait&states[]=watch 형태여야 하므로 doseq 사용
-            query = urlencode(params, doseq=True)
+            # 배열 파라미터는 states[]=wait&states[]=watch 형태여야 하므로 doseq 사용.
+            # unquote 필수 — 업비트는 percent-encoding 전 원문으로 해시를 검증한다
+            # (공식 샘플과 동일. 없으면 states[] 같은 배열 파라미터가 401)
+            query = unquote(urlencode(params, doseq=True))
             payload["query_hash"] = hashlib.sha512(query.encode()).hexdigest()
             payload["query_hash_alg"] = "SHA512"
         token = jwt.encode(payload, self.settings.secret_key, algorithm="HS512")

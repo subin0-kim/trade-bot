@@ -87,3 +87,12 @@ DryRunBroker(로컬 모의체결)가 KIS보다 훨씬 중요하며, `--live` 게
   라이브 원장은 상수(0.05%) 가정이 아니라 이 값으로 현금 계산 — 수수료 이벤트·등급에 안전.
 - KIS는 주문 조회에 수수료 없음 (계좌 단위 정산) → 근사치 0.21%(수수료+거래세) 유지.
   settle_order 시그니처는 (수량, 평균가, 수수료|None)로 양 브로커 통일.
+
+## JWT query_hash는 unquote된 원문으로 (2026-07-28 실측)
+
+배열 파라미터(`states[]=wait&states[]=watch`)가 있는 인증 GET에서
+`urlencode(params, doseq=True)`를 그대로 해시하면 **401 "Failed to verify the query of Jwt"**.
+업비트는 percent-encoding 전 원문(`[]` 리터럴)으로 해시를 검증하므로
+공식 샘플처럼 `unquote(urlencode(params, doseq=True))`를 해시해야 한다.
+uuid 등 특수문자 없는 파라미터는 양쪽이 동일해 그동안 드러나지 않았다
+(`get_open_orders`에서만 발현).
