@@ -71,16 +71,22 @@ def check_once(broker: KISBroker, threshold_pct: float, live: bool) -> int:
         # --- 재난 손절 발동 ---
         reason = f"장중 긴급손절 {change_pct:.2f}% ≤ -{threshold_pct}%"
         if live:
-            broker.place_order(OrderRequest(
+            order = broker.place_order(OrderRequest(
                 symbol=symbol, side=OrderSide.SELL,
                 quantity=Decimal(held.quantity), order_type=OrderType.MARKET,
             ))
+            filled, avg = broker.wait_fill(order.order_id)
+            if filled <= 0:
+                logger.error("⚠️ %s 긴급손절 미체결 (주문 %s) — 다음 점검 재시도", symbol, order.order_id)
+                continue
+            price = avg or price  # 실체결 평균가
         proceeds = price * held.quantity
         cost = entry * held.quantity
         fee_tax = proceeds * Decimal("0.0021")
         pnl = proceeds - fee_tax - cost
         state.cash = str(Decimal(state.cash) + proceeds - fee_tax)
         del state.positions[symbol]
+        state.save(STATE_PATH)  # 체결 즉시 저장
         fired += 1
 
         logger.warning("🚨 매도 %s %s: %d주 @%s — %s",

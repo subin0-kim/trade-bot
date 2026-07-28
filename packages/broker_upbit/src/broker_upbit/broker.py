@@ -236,6 +236,36 @@ class UpbitBroker:
             meta={"ord_type": params["ord_type"]},
         )
 
+    def get_order_fill(self, uuid: str) -> tuple[str, Decimal, Decimal | None]:
+        """(상태, 체결수량, 평균체결가). trades의 체결금액/수량 가중평균."""
+        data = self.client.get("/v1/order", {"uuid": uuid}, group="default", auth=True)
+        vol = Decimal(data.get("executed_volume") or "0")
+        avg = None
+        trades = data.get("trades") or []
+        if trades:
+            funds = sum(Decimal(t["funds"]) for t in trades)
+            tvol = sum(Decimal(t["volume"]) for t in trades)
+            avg = funds / tvol if tvol > 0 else None
+        return data.get("state", ""), vol, avg
+
+    def wait_fill(self, uuid: str, timeout: float = 15.0, interval: float = 1.0
+                  ) -> tuple[Decimal, Decimal | None]:
+        """체결 확인 폴링 — (체결수량, 평균체결가). 시장가는 보통 즉시 done."""
+        from time import monotonic, sleep
+
+        deadline = monotonic() + timeout
+        vol, avg = Decimal(0), None
+        while True:
+            try:
+                state, vol, avg = self.get_order_fill(uuid)
+                if state in ("done", "cancel"):
+                    return vol, avg
+            except Exception:
+                pass
+            if monotonic() > deadline:
+                return vol, avg
+            sleep(interval)
+
     def cancel_order(self, order: Order) -> None:
         self.client.delete("/v1/order", {"uuid": order.order_id})
 

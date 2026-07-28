@@ -73,3 +73,10 @@ DryRunBroker(로컬 모의체결)가 KIS보다 훨씬 중요하며, `--live` 게
 인증 API(잔고)는 키 입력 후 검증 예정.
 
 관련: [[kis-api-notes]]
+
+## 개별 주문 조회 (GET /v1/order) — 파라미터 있는 프라이빗 GET (2026-07-28)
+
+- `client.get`은 기본 `auth=False` — 프라이빗 GET은 **반드시 `auth=True`** (JWT에
+  query_hash 포함). 빠뜨리면 401 "Please check Authorization Header" (404가 아님!).
+- 체결 확인: `trades[]`의 funds/volume 가중평균이 실체결가. `state`: wait/done/cancel.
+  시장가는 보통 즉시 done. 그룹은 default(30/s) — order 그룹(8/s) 아님.

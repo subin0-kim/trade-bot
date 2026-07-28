@@ -184,23 +184,37 @@ def main():
 
         if exit_reason:
             price = broker.get_quote(symbol).price
+            sell_qty = Decimal(held.quantity)
+            partial = False
             if args.live:
-                broker.place_order(OrderRequest(
+                order = broker.place_order(OrderRequest(
                     symbol=symbol, side=OrderSide.SELL,
-                    quantity=Decimal(held.quantity), order_type=OrderType.MARKET,
+                    quantity=sell_qty, order_type=OrderType.MARKET,
                 ))
+                filled, avg = broker.wait_fill(order.order_id)
+                if filled <= 0:
+                    logger.error("⚠️ %s 매도 미체결 (주문 %s) — 포지션 유지", symbol, order.order_id)
+                    continue
+                price = avg or price  # 실체결 평균가로 기록
+                if filled < sell_qty:
+                    logger.warning("%s 부분체결 %s/%s — 잔여분 유지", symbol, filled, sell_qty)
+                    held.quantity = int(sell_qty - filled)
+                    sell_qty = filled
+                    partial = True
             entry_price = Decimal(held.entry_price)
-            proceeds = price * held.quantity
-            cost = entry_price * held.quantity
+            proceeds = price * sell_qty
+            cost = entry_price * sell_qty
             fee_tax = proceeds * Decimal("0.0021")  # 수수료+거래세 근사
             pnl = proceeds - fee_tax - cost
             state.cash = str(Decimal(state.cash) + proceeds - fee_tax)
-            del state.positions[symbol]
+            if not partial:
+                del state.positions[symbol]
+            state.save(STATE_PATH)  # 체결 즉시 저장
             logger.info("매도 %s %s: %d주 @%s (%+.2f%%) — %s",
-                        symbol, held.name, held.quantity, price,
+                        symbol, held.name, int(sell_qty), price,
                         float(pnl / cost * 100), exit_reason)
             events.append("exit", {
-                "symbol": symbol, "name": held.name, "quantity": str(held.quantity),
+                "symbol": symbol, "name": held.name, "quantity": str(sell_qty),
                 "entry_price": held.entry_price, "exit_price": str(price),
                 "pnl": str(pnl), "pnl_pct": round(float(pnl / cost * 100), 3),
                 "win": pnl > 0, "holding_bars": held.bars_held,
@@ -239,10 +253,17 @@ def main():
                 if qty < 1:
                     continue
                 if args.live:
-                    broker.place_order(OrderRequest(
+                    order = broker.place_order(OrderRequest(
                         symbol=symbol, side=OrderSide.BUY,
                         quantity=Decimal(qty), order_type=OrderType.MARKET,
                     ))
+                    filled, avg = broker.wait_fill(order.order_id)
+                    if filled <= 0:
+                        logger.error("⚠️ %s 매수 미체결 (주문 %s) — 원장 기록 없음",
+                                     symbol, order.order_id)
+                        continue
+                    qty = int(filled)          # 실체결 수량·평균가 기준으로 기록
+                    price = avg or price
                 cost = price * qty
                 fee = cost * Decimal("0.00015")
                 state.cash = str(Decimal(state.cash) - cost - fee)
@@ -251,6 +272,7 @@ def main():
                     entry_price=str(price), entry_ts=datetime.now().isoformat(),
                     strategy=preset_name, highest_close=str(price),
                 )
+                state.save(STATE_PATH)  # 체결 즉시 저장
                 slots -= 1
                 reasons = list(decision.reasons) + [f"레짐:{regime.value}", f"나스닥 {us_ret:+.2f}%"]
                 logger.info("매수 %s %s: %d주 @%s — %s", symbol, name, qty, price, reasons[0])

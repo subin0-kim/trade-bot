@@ -285,7 +285,7 @@ class KISBroker:
 
         data = self.client.post("/uapi/domestic-stock/v1/trading/order-cash", tr_id, body)
         output = data["output"]
-        return Order(
+        return Order(  # noqa: 아래 wait_fill로 체결 확인 가능
             order_id=output["ODNO"],
             symbol=request.symbol,
             side=request.side,
@@ -299,6 +299,48 @@ class KISBroker:
                 "ord_tmd": output.get("ORD_TMD", ""),
             },
         )
+
+    def get_order_fill(self, odno: str) -> tuple[Decimal, Decimal | None]:
+        """당일 주문의 (총체결수량, 평균체결가). 미체결이면 (0, None).
+
+        주식일별주문체결조회(TTTC0081R/VTTC0081R) — ODNO 필터.
+        """
+        tr_id = "VTTC0081R" if self.settings.is_paper else "TTTC0081R"
+        today = date.today().strftime("%Y%m%d")
+        data = self.client.get(
+            "/uapi/domestic-stock/v1/trading/inquire-daily-ccld", tr_id,
+            {
+                "CANO": self.settings.account, "ACNT_PRDT_CD": self.settings.product,
+                "INQR_STRT_DT": today, "INQR_END_DT": today,
+                "SLL_BUY_DVSN_CD": "00", "PDNO": "", "CCLD_DVSN": "00",
+                "INQR_DVSN": "00", "INQR_DVSN_1": "", "INQR_DVSN_3": "00",
+                "ORD_GNO_BRNO": "", "ODNO": odno,
+                "CTX_AREA_FK100": "", "CTX_AREA_NK100": "", "EXCG_ID_DVSN_CD": "KRX",
+            },
+        )
+        key = odno.lstrip("0")
+        for row in data.get("output1", []):
+            if row.get("odno", "").lstrip("0") == key:
+                qty = _dec(row.get("tot_ccld_qty"), "0")
+                amt = _dec(row.get("tot_ccld_amt"), "0")
+                return qty, (amt / qty if qty > 0 else None)
+        return Decimal(0), None
+
+    def wait_fill(self, odno: str, timeout: float = 20.0, interval: float = 2.0
+                  ) -> tuple[Decimal, Decimal | None]:
+        """체결 확인 폴링 — (체결수량, 평균체결가). 장중 시장가는 보통 1~2회 안에 확정."""
+        from time import monotonic, sleep
+
+        deadline = monotonic() + timeout
+        qty, avg = Decimal(0), None
+        while True:
+            try:
+                qty, avg = self.get_order_fill(odno)
+            except Exception:
+                pass
+            if qty > 0 or monotonic() > deadline:
+                return qty, avg
+            sleep(interval)
 
     def cancel_order(self, order: Order) -> None:
         """전량 취소."""

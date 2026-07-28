@@ -357,3 +357,12 @@
 - API quirk: 모의서버 미지원(OPSQ0002), 1일 1회 권고 → kis-api-notes 기록, 카탈로그 갱신
 - deploy/: systemd 유닛·타이머 4종 (TZ=Asia/Seoul 명시, Persistent), 백업 스크립트, 배포 절차서
 - 대시보드는 Tailscale + 정적 서빙 권장 (Firebase 불채택 — data/ 파일이 진실 원천, 백업으로 영속화)
+
+## [2026-07-28] ingest | 라이브 체결 확인 루프 — 주문 후 실체결 검증
+
+- 문제: --live에서 주문 후 호가 기준으로 체결 가정 → 원장-실계좌 괴리 (슬리피지/미체결/부분체결)
+- broker_upbit.wait_fill (GET /v1/order, auth=True 필수 — 401 함정 발견),
+  broker_kis.wait_fill (TTTC0081R, 모의 지원, ODNO 패딩 주의)
+- 봇 3곳(coin/swing/monitor): 미체결→기록 없음/포지션 유지, 부분체결→잔여 유지,
+  실체결 평균가로 원장·이벤트 기록, 체결 즉시 state.save (사이클 중단 대비)
+- dry-run 경로는 기존과 동일 (시뮬레이션 체결)

@@ -152,21 +152,28 @@ def place_buy(broker, state, events, symbol, krw_amount, strategy_tag, reasons, 
     qty = (Decimal(str(krw_amount)) / quote.price).quantize(Decimal("0.00000001"))
     if qty * quote.price < 5000:
         return False
+    entry_price = quote.price
     if live:
-        broker.place_order(OrderRequest(
+        order = broker.place_order(OrderRequest(
             symbol=symbol, side=OrderSide.BUY, quantity=qty, order_type=OrderType.MARKET,
         ))
-    cost = quote.price * qty
+        filled, avg = broker.wait_fill(order.order_id)
+        if filled <= 0:
+            logger.error("⚠️ %s 매수 미체결 (주문 %s) — 원장 기록 없음", symbol, order.order_id)
+            return False
+        qty, entry_price = filled, (avg or quote.price)  # 실체결 기준으로 원장 기록
+    cost = entry_price * qty
     state.cash = str(Decimal(state.cash) - cost * (1 + FEE))
     state.positions[symbol] = CoinPosition(
-        symbol=symbol, quantity=str(qty), entry_price=str(quote.price),
+        symbol=symbol, quantity=str(qty), entry_price=str(entry_price),
         entry_ts=datetime.now().isoformat(), strategy=strategy_tag,
-        highest_close=str(quote.price), exit_due=exit_due,
+        highest_close=str(entry_price), exit_due=exit_due,
     )
-    logger.info("매수 %s: %s @ %s (%s)", symbol, qty, f"{quote.price:,}", strategy_tag)
+    state.save(STATE_PATH)  # 체결 즉시 저장 — 사이클 중단 시 원장-실계좌 불일치 방지
+    logger.info("매수 %s: %s @ %s (%s)", symbol, qty, f"{entry_price:,}", strategy_tag)
     events.append("entry", {
         "symbol": symbol, "name": symbol.replace("KRW-", ""), "quantity": str(qty),
-        "price": str(quote.price), "strategy": strategy_tag, "reasons": reasons,
+        "price": str(entry_price), "strategy": strategy_tag, "reasons": reasons,
     })
     return True
 
@@ -174,21 +181,36 @@ def place_buy(broker, state, events, symbol, krw_amount, strategy_tag, reasons, 
 def place_sell(broker, state, events, pos: CoinPosition, reason, live):
     quote = broker.get_quote(pos.symbol)
     qty = Decimal(pos.quantity)
+    exit_price = quote.price
+    partial = False
     if live:
-        broker.place_order(OrderRequest(
+        order = broker.place_order(OrderRequest(
             symbol=pos.symbol, side=OrderSide.SELL, quantity=qty, order_type=OrderType.MARKET,
         ))
-    proceeds = quote.price * qty * (1 - FEE)
+        filled, avg = broker.wait_fill(order.order_id)
+        if filled <= 0:
+            logger.error("⚠️ %s 매도 미체결 (주문 %s) — 포지션 유지, 다음 사이클 재시도",
+                         pos.symbol, order.order_id)
+            return
+        exit_price = avg or quote.price
+        if filled < qty:  # 부분체결 — 잔여 수량으로 포지션 유지
+            logger.warning("%s 부분체결 %s/%s — 잔여분 유지", pos.symbol, filled, qty)
+            pos.quantity = str(qty - filled)
+            qty = filled
+            partial = True
+    proceeds = exit_price * qty * (1 - FEE)
     cost = Decimal(pos.entry_price) * qty
     pnl = proceeds - cost
     state.cash = str(Decimal(state.cash) + proceeds)
-    del state.positions[pos.symbol]
+    if not partial:
+        del state.positions[pos.symbol]
+    state.save(STATE_PATH)  # 체결 즉시 저장
     pnl_pct = float(pnl / cost * 100) if cost else 0.0
     logger.info("매도 %s: %+.2f%% — %s", pos.symbol, pnl_pct, reason)
     events.append("exit", {
         "symbol": pos.symbol, "name": pos.symbol.replace("KRW-", ""),
-        "quantity": pos.quantity, "entry_price": pos.entry_price,
-        "exit_price": str(quote.price), "pnl": str(pnl), "pnl_pct": round(pnl_pct, 3),
+        "quantity": str(qty), "entry_price": pos.entry_price,
+        "exit_price": str(exit_price), "pnl": str(pnl), "pnl_pct": round(pnl_pct, 3),
         "win": pnl > 0, "holding_bars": 0, "strategy": pos.strategy, "reasons": [reason],
     })
 
