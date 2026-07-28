@@ -135,6 +135,12 @@ def main():
             return
 
     broker = KISBroker(env=args.env)
+
+    from .holiday import is_trading_day
+    if not is_trading_day(date.today(), DATA_DIR / "cache"):
+        logger.info("휴장일(주말/공휴일) — 사이클 스킵")
+        return
+
     events = JsonlEventLog(EVENTS_PATH, source=BOT_NAME)
     state = BotState.load(STATE_PATH, INITIAL_CASH)
     mode = f"{args.env}/{'LIVE' if args.live else 'DRY-RUN'}"

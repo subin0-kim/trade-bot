@@ -51,6 +51,25 @@ class KISBroker:
             ts=datetime.now(),
         )
 
+    def is_open_day(self, d: date) -> bool | None:
+        """국내 개장일 여부 (CTCA0903R). 실패 시 None.
+
+        ⚠️ 원장 연동 서비스라 공식 가이드가 '1일 1회 호출'을 권고 —
+        호출부는 반드시 일 단위로 캐시할 것 (bot_swing.holiday 참조).
+        """
+        try:
+            data = self.client.get(
+                "/uapi/domestic-stock/v1/quotations/chk-holiday",
+                "CTCA0903R",
+                {"BASS_DT": d.strftime("%Y%m%d"), "CTX_AREA_FK": "", "CTX_AREA_NK": ""},
+            )
+        except Exception:
+            return None
+        for row in data.get("output", []):
+            if row.get("bass_dt") == d.strftime("%Y%m%d"):
+                return row.get("opnd_yn") == "Y"
+        return None
+
     def get_daily_candles(
         self, symbol: str, start: date, end: date, period: str = "D"
     ) -> list[Candle]:

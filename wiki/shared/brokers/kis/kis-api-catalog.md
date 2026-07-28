@@ -43,6 +43,6 @@ sources:
 | `inquire_balance` | 잔고+보유종목 | 구현됨: `get_balance`/`get_positions` |
 | `inquire_psbl_rvsecncl` | 미체결 조회 | 구현됨 (모의투자 미지원 주의) |
 | `inquire_psbl_order` | 매수가능금액 조회 | 미구현 |
-| `chk_holiday` | 휴장일 확인 | 봇 스케줄러에 필요, 미구현 |
+| `chk_holiday` | 휴장일 확인 | ✅ 구현 (broker.is_open_day, 모의 미지원 — 실전으로 조회) |
 
 레이트리밋 등 운영 주의사항은 [[kis-api-notes]] 참조.

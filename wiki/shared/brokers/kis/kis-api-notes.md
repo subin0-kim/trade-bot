@@ -33,3 +33,13 @@ sources:
 - 취소 주문에는 원주문의 `KRX_FWDG_ORD_ORGNO`(주문채번지점번호) 필요 → 주문 시 meta에 보관
 - 잔고 조회 output2: `dnca_tot_amt` 예수금, `prvs_rcdl_excc_amt` D+2 예수금(주문가능 기준), `tot_evlu_amt` 총평가
 - NXT(대체거래소) 지원으로 시장분류코드가 J(KRX)/NX(NXT)/UN(통합)으로 나뉨 — 현재 J만 사용
+
+## 휴장일 조회 (CTCA0903R) — 모의서버 미지원 (2026-07-28)
+
+- `chk-holiday`(국내휴장일조회)는 **모의투자 서버에서 "없는 서비스 코드"(OPSQ0002)** —
+  원장 연동 API라 실전 전용. 봇이 paper 환경이어도 휴장일 확인은 실전 서버로 해야 한다
+  (시세성 read-only라 주문과 무관).
+- 공식 가이드가 **1일 1회 호출 권고** (원장 부하) → `bot_swing.holiday`가
+  `data/cache/kis_holiday.json`에 일 단위 캐시. 주말은 API 없이 로컬 판정.
+- 실패 시 fail-open(개장일 간주): 휴장일 오판으로 하루를 건너뛰는 것보다
+  돌았다가 주문 거부되는 쪽이 덜 해롭다.

@@ -1,0 +1,13 @@
+[Unit]
+Description=스윙봇 일일 사이클 (dry-run) + 대시보드 갱신
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=trading
+WorkingDirectory=/opt/stock-trade-bot
+Environment=TZ=Asia/Seoul
+Environment=KIS_CONFIG_PATH=/etc/trading/kis_devlp.yaml
+ExecStart=/bin/bash -lc 'uv run bot-swing && uv run dashboard-build'
+TimeoutStartSec=900

@@ -1,0 +1,14 @@
+[Unit]
+Description=스윙봇 장중 손절 감시 1회 점검 (매수 없음)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=trading
+WorkingDirectory=/opt/stock-trade-bot
+Environment=TZ=Asia/Seoul
+Environment=KIS_CONFIG_PATH=/etc/trading/kis_devlp.yaml
+# --loop 없이 1회 점검 — 반복은 systemd 타이머가 담당 (장시간·휴장 판정은 봇이 자체 수행)
+ExecStart=/bin/bash -lc 'uv run bot-swing-monitor && uv run dashboard-build'
+TimeoutStartSec=300

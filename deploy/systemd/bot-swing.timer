@@ -1,0 +1,9 @@
+[Unit]
+Description=스윙봇 평일 09:05 (휴장일은 봇이 자체 스킵)
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 09:05:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

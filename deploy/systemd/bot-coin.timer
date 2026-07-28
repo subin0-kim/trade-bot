@@ -1,0 +1,10 @@
+[Unit]
+Description=코인봇 매시 정각+5분 (10~11시 쇼크 창 포함, 24시간)
+
+[Timer]
+# 매시 05분 — 정각 직후 완성된 봉 기준으로 판단
+OnCalendar=*-*-* *:05:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

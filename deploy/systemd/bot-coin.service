@@ -1,0 +1,14 @@
+[Unit]
+Description=코인봇 1사이클 (dry-run) + 대시보드 갱신
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=trading
+WorkingDirectory=/opt/stock-trade-bot
+Environment=TZ=Asia/Seoul
+Environment=UPBIT_CONFIG_PATH=/etc/trading/upbit.yaml
+Environment=KIS_CONFIG_PATH=/etc/trading/kis_devlp.yaml
+ExecStart=/bin/bash -lc 'uv run bot-coin && uv run dashboard-build'
+TimeoutStartSec=600

@@ -1,0 +1,9 @@
+[Unit]
+Description=장중 손절 감시 — 평일 09:00~15:30 30분 간격 (15:20 이후는 봇이 자체 스킵)
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 09..15:00,30:00
+Persistent=false
+
+[Install]
+WantedBy=timers.target

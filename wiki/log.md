@@ -350,3 +350,10 @@
 - 위성 +74.8→+198.3% (PF 2.2, 분할 ✓), 결합 +189.2%. 기여 분산 확인 (12/15 플러스, 1위 26%)
 - 생존 편향(현재 시총으로 과거 검증) 명시 — 전방 검증이 최종 판정, 분기 순위 갱신
 - 갱신: crypto-principle-strategies.md
+
+## [2026-07-28] ingest | 서버 배포 준비 — 휴장일 가드 + systemd 배포 세트
+
+- 스윙봇 main/monitor에 휴장일 가드: 주말 로컬 판정 + CTCA0903R(실전 전용, 일 캐시), fail-open
+- API quirk: 모의서버 미지원(OPSQ0002), 1일 1회 권고 → kis-api-notes 기록, 카탈로그 갱신
+- deploy/: systemd 유닛·타이머 4종 (TZ=Asia/Seoul 명시, Persistent), 백업 스크립트, 배포 절차서
+- 대시보드는 Tailscale + 정적 서빙 권장 (Firebase 불채택 — data/ 파일이 진실 원천, 백업으로 영속화)

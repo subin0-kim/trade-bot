@@ -114,7 +114,15 @@ def main():
     mode = f"{args.env}/{'LIVE' if args.live else 'DRY-RUN'}"
     logger.info("감시 시작 [%s] 임계 -%.1f%% (매수 없음)", mode, args.threshold)
 
+    from datetime import date as _date
+
+    from .holiday import is_trading_day
+    from .main import DATA_DIR
+
     while True:
+        if not args.ignore_hours and not is_trading_day(_date.today(), DATA_DIR / "cache"):
+            logger.info("휴장일 — 감시 종료")
+            break
         if args.ignore_hours or in_market_hours():
             fired = check_once(broker, args.threshold, args.live)
             if fired:
