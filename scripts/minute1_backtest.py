@@ -69,7 +69,7 @@ def main():
     merged = {**daily_5m, **daily_1m}  # 겹치는 날은 1분봉 유래가 이김 (동일해야 정상)
     btc_daily = [merged[d] for d in sorted(merged)]
     ens = ensemble_flags(btc_daily)
-    states = {d: ("bull" if f else "off") for d, f in ens.items()}
+    states = {d + timedelta(days=1): ("bull" if f else "off") for d, f in ens.items()}  # 전일 플래그 = 라이브 동일
 
     data = {}
     for s in TOP_MCAP_ALTS:

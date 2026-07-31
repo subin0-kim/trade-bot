@@ -14,7 +14,7 @@
 from __future__ import annotations
 
 import sys
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 sys.path.insert(0, "scripts")
@@ -64,7 +64,9 @@ def stats(daily: dict[date, float], ds) -> tuple[float, float]:
 def main():
     btc_daily = to_daily(load_5m("KRW-BTC"))
     ens = ensemble_flags(btc_daily)
-    states = {d: ("bull" if f else "off") for d, f in ens.items()}
+    # 전일 완성 일봉의 플래그를 오늘 적용 — 라이브 봇(main.py asset_regime)과 동일.
+    # 당일 플래그를 쓰면 장중 봉이 그날 자정 종가 정보를 미리 보는 미래참조 (+40%p 낙관, 2026-07-31 실측)
+    states = {d + timedelta(days=1): ("bull" if f else "off") for d, f in ens.items()}
 
     raw5 = {s: load_5m(s) for s in TOP_MCAP_ALTS}
     data = {s: to_timeframe(b, "240m") for s, b in raw5.items() if b}

@@ -38,7 +38,8 @@ def main():
     core_btc = btc_core_curve(btc_daily, btc_flags)
     core_eth = btc_core_curve(eth_daily, eth_flags)
 
-    states = {d: ("bull" if f else "off") for d, f in btc_flags.items()}
+    # 위성도 라이브와 동일하게 전일 플래그 적용 (당일 플래그 = 일중 미래참조)
+    states = {d + timedelta(days=1): ("bull" if f else "off") for d, f in btc_flags.items()}
     raw5 = {s: load_5m(s) for s in TOP_MCAP_ALTS}
     data = {s: to_timeframe(b, "240m") for s, b in raw5.items() if b}
     data = {s: b for s, b in data.items() if len(b) > 600}
