@@ -41,7 +41,10 @@ bots: [coin]
 
 ## 재측정 미완 (다음 lint/ingest 과제)
 
-- [[crypto-principle-strategies]]의 코어+위성 결합·하락장 수치 (구엔진 산출)
+- ~~코어+위성 결합~~ → **완료 (`scripts/coinbot_full_sim.py`)**: 최근 2년(2024-07~2026-07)
+  BTC25/ETH25/위성50 결합 **+132.0% / MDD 15.6%** (BTC 보유 -1.2%, ETH 보유 -38.5%).
+  쇼크 슬리브 제외, 슬리브별 독립 복리 가정
+- [[crypto-principle-strategies]]의 하락장 세부 수치 (구엔진 산출)
 - 레짐 기준 대전([[crypto-regime-findings]])의 포트폴리오 곡선 비교 — 코어 곡선은
   일봉 로직이라 무관하고, 위성 곡선 절대값만 바뀜 (기준 간 상대 순위는 유지 추정)
 - BTC/ETH 위성 편입 기각, 코어 확대 실험 수치
