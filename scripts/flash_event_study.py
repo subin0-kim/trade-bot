@@ -42,7 +42,13 @@ def main():
     merged = {**daily_5m, **daily_1m}
     ens = ensemble_flags([merged[d] for d in sorted(merged)])
 
-    events: dict[tuple[str, str], list[dict]] = {}   # (종류, 레짐) → 이벤트들
+    # 기간 분할: 마지막 봉 기준 최근 365일 = 후반(하락장), 그 이전 = 전반(상승장 포함)
+    from datetime import timedelta
+    all_last = max(load_1m(p.stem)[-1].ts for p in sorted(CACHE_1M.glob("*.jsonl"))
+                   if load_1m(p.stem))
+    boundary = all_last - timedelta(days=365)
+
+    events: dict[tuple[str, str, str], list[dict]] = {}   # (종류, 기간, 레짐) → 이벤트들
     n_sym = 0
     for path in sorted(CACHE_1M.glob("*.jsonl")):
         bars = load_1m(path.stem)
@@ -58,17 +64,20 @@ def main():
                 continue
             last_evt = i
             kind = "급락" if r5 < 0 else "급등"
+            half = "전반(상승)" if bars[i].ts < boundary else "후반(하락)"
             regime = "bull" if ens.get(bars[i].ts.date(), False) else "off"
             evt = {"r5": r5 * 100}
             for h in HORIZONS:
                 evt[f"f{h}"] = fwd(closes, i, h)
             if kind == "급락" and i + 60 < len(bars):
                 evt["knife"] = (min(lows[i + 1 : i + 61]) / closes[i] - 1) * 100
-            events.setdefault((kind, regime), []).append(evt)
+            events.setdefault((kind, half, regime), []).append(evt)
 
-    print(f"이벤트 정의: 5분 수익률 ±{THRESH*100:.0f}% | {n_sym}종목 × 180일 | 쿨다운 {COOLDOWN}분\n")
-    for (kind, regime), evts in sorted(events.items()):
-        print(f"[{kind} | 레짐 {regime}] {len(evts)}건 (평균 트리거 {statistics.mean(e['r5'] for e in evts):+.2f}%)")
+    print(f"이벤트 정의: 5분 수익률 ±{THRESH*100:.0f}% | {n_sym}종목 | 쿨다운 {COOLDOWN}분 | "
+          f"기간 경계 {boundary:%Y-%m-%d}\n")
+    for (kind, half, regime), evts in sorted(events.items()):
+        print(f"[{kind} | {half} | 레짐 {regime}] {len(evts)}건 "
+              f"(평균 트리거 {statistics.mean(e['r5'] for e in evts):+.2f}%)")
         for h in HORIZONS:
             vals = [e[f"f{h}"] for e in evts if e[f"f{h}"] is not None]
             if not vals:
