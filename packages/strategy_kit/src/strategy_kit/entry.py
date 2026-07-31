@@ -607,8 +607,8 @@ class VolumeSpikeReversalEntry:
         candles = view.primary
         vols = volumes(candles)
         v_ma = sma(vols, self.vol_period)
-        if len(vols) < self.vol_period + 1 or v_ma[-2] is None:
-            return None
+        if len(vols) < self.vol_period + 1 or v_ma[-2] is None or v_ma[-2] <= 0:
+            return None  # MA=0은 거래정지 구간 (재개 직후 0나눗셈 방어)
         last = candles[-1]
         if vols[-1] >= v_ma[-2] * self.vol_mult and last.close > last.open:
             return EntryEvent(

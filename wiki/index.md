@@ -19,7 +19,7 @@
 ## shared/strategies
 
 - [[strategy-framework]] — 전략 모듈 분해 스키마, 등재 게이트, MTF 규칙 (2026-07-26)
-- [[strategy-candidates]] — 2026-07 1차 조사: 문헌 4종 + 유튜브 5종 수치화 + 게이트 판정 (2026-07-27)
+- [[strategy-candidates]] — 2026-07 1차 조사: 문헌 4종 + 유튜브 5종 수치화 + 게이트 판정, 장중손절·재해선·1분봉 기각 실측 (2026-07-31)
 - [[connors-rsi2]] — ✅ 게이트 통과, SIDEWAYS 슬롯. Connors & Alvarez (2008) (2026-07-27)
 - [[turtle-20-10]] — ✅ 게이트 통과, BULL 백업. 터틀 System 1 (2026-07-27)
 - [[timeframe-comparison]] — 60분봉 vs 일봉: 평균회귀는 붕괴, 추세추종은 개선 (2026-07-27)
@@ -31,7 +31,7 @@
 
 ## incidents
 
-(없음)
+- [[2026-07-31-portfolio-engine-daily-sampling]] — 포트폴리오 엔진이 날짜 단위 순회 → 코인 240m이 "하루 1회 판단"이었음. 봉 단위 수정, 챔피언 +216→+278% 재기준선 (2026-07-31)
 
 ## shared/market-regimes
 

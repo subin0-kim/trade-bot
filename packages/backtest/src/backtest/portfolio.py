@@ -10,7 +10,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import datetime
 from decimal import ROUND_DOWN, Decimal
 
 from strategy_kit import CompositeStrategy, MarketView, OpenPosition
@@ -63,7 +63,8 @@ class PortfolioResult:
 class _SymbolState:
     candles: list[Candle]
     higher: dict[str, tuple[list[Candle], list[int]]]
-    idx_by_date: dict[date, int]
+    idx_by_ts: dict[datetime, int]
+    cur_i: int | None = None          # 지금까지 등장한 마지막 봉 인덱스 (시가평가용)
     position: OpenPosition | None = None
     trade: Trade | None = None
     pending: dict | None = None
@@ -105,10 +106,12 @@ class PortfolioBacktester:
             states[symbol] = _SymbolState(
                 candles=candles,
                 higher={tf: resample_progressive(candles, tf) for tf in self.higher_tfs},
-                idx_by_date={c.ts.date(): i for i, c in enumerate(candles)},
+                idx_by_ts={c.ts: i for i, c in enumerate(candles)},
             )
 
-        all_dates = sorted({c.ts.date() for st in states.values() for c in st.candles})
+        # 봉 타임스탬프 단위 순회 — 일봉은 날짜 순회와 동일하고, 장중봉(240m/1m)은
+        # 모든 봉에서 판단한다 (과거엔 날짜당 마지막 봉만 판단하는 버그가 있었음)
+        all_ts = sorted({c.ts for st in states.values() for c in st.candles})
         result = PortfolioResult(
             strategy=self.strategy.name,
             initial_cash=self.initial_cash,
@@ -117,30 +120,34 @@ class PortfolioBacktester:
         cash = self.initial_cash
         weight_samples: list[float] = []
 
-        def equity_at(d: date) -> Decimal:
+        def equity_now() -> Decimal:
             total = cash
             for st in states.values():
-                if st.position is None:
+                if st.position is None or st.cur_i is None:
                     continue
-                i = st.idx_by_date.get(d)
-                price = st.candles[i].close if i is not None else st.candles[-1].close
-                total += st.position.quantity * price
+                total += st.position.quantity * st.candles[st.cur_i].close
             return total
 
-        for d in all_dates:
-            # --- 1) 보류 주문 체결 (오늘 봉 시가) ---
+        for ts in all_ts:
+            # --- 0) 심볼별 현재봉 커서 전진 (이번 ts에 봉이 없으면 직전 봉 유지) ---
+            for st in states.values():
+                i = st.idx_by_ts.get(ts)
+                if i is not None:
+                    st.cur_i = i
+
+            # --- 1) 보류 주문 체결 (이번 봉 시가) ---
             for symbol, st in states.items():
                 if st.pending is None:
                     continue
-                i = st.idx_by_date.get(d)
+                i = st.idx_by_ts.get(ts)
                 if i is None:
-                    continue  # 오늘 이 종목 휴장/거래정지 → 다음 거래일에 체결
+                    continue  # 이 종목은 이번 ts에 봉 없음(휴장/거래공백) → 다음 봉에 체결
                 bar = st.candles[i]
                 pending, st.pending = st.pending, None
                 if pending["action"] == "enter" and st.position is None:
                     fill = bar.open * (1 + self.slippage_rate)
                     # 분산 강제: 종목당 자산/max_positions 상한
-                    cap = equity_at(d) / self.max_positions
+                    cap = equity_now() / self.max_positions
                     cap_qty = ((cap / fill) / self.quantity_step).to_integral_value(
                         rounding=ROUND_DOWN) * self.quantity_step
                     qty = min(pending["quantity"], cap_qty)
@@ -179,7 +186,7 @@ class PortfolioBacktester:
             candidates: list[tuple[float, str, dict]] = []
 
             for symbol, st in states.items():
-                i = st.idx_by_date.get(d)
+                i = st.idx_by_ts.get(ts)
                 if i is None or i < self.warmup:
                     continue
                 bar = st.candles[i]
@@ -198,7 +205,7 @@ class PortfolioBacktester:
                     },
                     quantity_step=self.quantity_step,
                 )
-                decision = self.strategy.evaluate(view, st.position, equity_at(d))
+                decision = self.strategy.evaluate(view, st.position, equity_now())
                 if decision.action == "exit" and st.position is not None:
                     st.pending = {"action": "exit", "reason": " / ".join(decision.reasons)}
                 elif decision.action == "enter" and st.position is None:
@@ -217,12 +224,12 @@ class PortfolioBacktester:
             for _, symbol, pending in candidates[: max(slots, 0)]:
                 states[symbol].pending = pending
 
-            eq = equity_at(d)
-            result.equity_curve.append((datetime.combine(d, datetime.min.time()), eq))
+            eq = equity_now()
+            result.equity_curve.append((ts, eq))
             if eq > 0:
                 weight_samples.append(float((eq - cash) / eq * 100))
 
-        result.final_equity = equity_at(all_dates[-1])
+        result.final_equity = equity_now()
         result.exposure_pct = (
             sum(weight_samples) / len(weight_samples) if weight_samples else 0.0
         )
@@ -237,9 +244,9 @@ class PortfolioBacktester:
             )
         if bench_rets:
             result.bench_return_pct = sum(bench_rets) / len(bench_rets)
-            # 동일가중 곡선의 MDD
+            # 동일가중 곡선의 MDD (일 단위 샘플링)
             peak, mdd = 0.0, 0.0
-            for d in all_dates:
+            for d in sorted({ts.date() for ts in all_ts}):
                 vals = [curve[d] for curve in bench_curves if d in curve]
                 if not vals:
                     continue

@@ -84,6 +84,11 @@ class UpbitBroker:
     def _candles(self, path: str, symbol: str, count: int, to: str | None = None) -> list[Candle]:
         params = {"market": symbol, "count": min(count, 200)}
         if to:
+            # 우리 ts는 전부 KST(candle_date_time_kst)인데, 타임존 없이 보내면 업비트가
+            # UTC로 해석해 9시간 밀린 구간을 반환한다 (1분봉 페이징은 창(3.3h)보다 오프셋이
+            # 커서 같은 구간만 반복 → 수집 정지). KST임을 명시한다.
+            if "+" not in to and not to.endswith("Z"):
+                to = to + "+09:00"
             params["to"] = to
         rows = self.client.get(path, params)
         candles = [
