@@ -130,22 +130,23 @@ def simulate(events, day_close, start, end, slot_frac, max_pos):
 def main():
     events, day_close, all_last = build_events_and_marks()
     end = all_last.date()
-    start = end - timedelta(days=365)
-    year_events = [e for e in events if start <= e["ts"].date() <= end]
-    print(f"기간: {start} ~ {end} (최근 1년, 하락장) | 이벤트 {len(year_events)}건 | 시작 {BUDGET:,}원\n")
-
-    for label, frac, mx in (("보수 (5%×10슬롯)", 0.05, 10),
-                            ("중간 (10%×5슬롯)", 0.10, 5),
-                            ("공격 (25%×4슬롯)", 0.25, 4)):
-        r = simulate(events, day_close, start, end, frac, mx)
-        print(f"{label:<16} 최종 {r['final']:>12,.0f}원 ({r['ret']:+.1f}%) | MDD {r['mdd']:.1f}% | "
-              f"거래 {r['trades']} (승률 {r['win']:.0f}%, 평균 {r['avg']:+,.0f}원) | 슬롯부족 스킵 {r['skipped']}")
-
-    # 참고 벤치마크: 같은 기간 BTC 보유
+    boundary = end - timedelta(days=365)
     btc = load_1m("KRW-BTC")
-    b0 = next(float(b.close) for b in btc if b.ts.date() >= start)
-    b1 = float(btc[-1].close)
-    print(f"\n참고 — 같은 기간 BTC 보유: {(b1/b0-1)*100:+.1f}%")
+    btc_daily = {b.ts.date(): float(b.close) for b in btc}
+
+    for period, (start, stop) in (("상승년 2024-08~2025-07", (boundary - timedelta(days=365), boundary)),
+                                  ("하락년 2025-08~현재", (boundary + timedelta(days=1), end))):
+        n_evt = sum(1 for e in events if start <= e["ts"].date() <= stop)
+        print(f"[{period}] 이벤트 {n_evt}건 | 시작 {BUDGET:,}원")
+        for label, frac, mx in (("보수 (5%×10슬롯)", 0.05, 10),
+                                ("중간 (10%×5슬롯)", 0.10, 5),
+                                ("공격 (25%×4슬롯)", 0.25, 4)):
+            r = simulate(events, day_close, start, stop, frac, mx)
+            print(f"  {label:<16} 최종 {r['final']:>12,.0f}원 ({r['ret']:+.1f}%) | MDD {r['mdd']:.1f}% | "
+                  f"거래 {r['trades']} (승률 {r['win']:.0f}%, 평균 {r['avg']:+,.0f}원) | 슬롯부족 스킵 {r['skipped']}")
+        b0 = next(btc_daily[d] for d in sorted(btc_daily) if d >= start)
+        b1 = max(btc_daily[d] for d in [max(d for d in btc_daily if d <= stop)])
+        print(f"  참고 — 같은 기간 BTC 보유: {(b1/b0-1)*100:+.1f}%\n")
 
 
 if __name__ == "__main__":
