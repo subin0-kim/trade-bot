@@ -121,7 +121,9 @@ def load_bots(events_dir: Path) -> list[BotMetrics]:
                 except (KeyError, ValueError):
                     continue
     for bot in bots.values():
-        bot.equity_curve.sort()
+        # 날짜만 키로 안정 정렬 — 튜플 통짜 정렬은 같은 날 스냅샷을 '값 오름차순'으로
+        # 재배열해 마지막 값이 최신이 아닌 그날의 최댓값이 됨 (수익률 낙관 왜곡)
+        bot.equity_curve.sort(key=lambda x: x[0])
         bot.entries.sort(key=lambda e: e.get("ts", ""))
         bot.exits.sort(key=lambda e: e.get("ts", ""))
     # 이벤트가 있는 봇만
