@@ -13,7 +13,7 @@
 - `packages/regime` (`regime`): 시장 레짐 판별 (KOSPI 지수 → bull/bear/sideways, 히스테리시스)
 - `apps/bot_swing`: **스윙봇 (운용 단계)** — 하루 1회 메인 사이클(현금/connors/macd + US필터) + 장중 손절 감시(`monitor.py`, 매수 없는 리스크 오버레이), 상태 영속화(`data/state/`)
 - `apps/dashboard`: 이벤트 로그 → self-contained HTML 대시보드 (`uv run dashboard-build`)
-- `apps/bot_coin`: **코인봇 (실전 운용 단계, 2026-07-28~)** — 검증 2전략(BTC정배열→알트돌파 / 오픈쇼크→알트추종) + 부정지식 필터. **봇 원장에 기록된 포지션만 관리 (기존 보유 자산 불가침)**, 예산 상한제. 원장에 생성 모드 기록 — 실행 모드와 불일치 시 기동 거부, 무인 live는 `--live --yes`
+- `apps/bot_coin`: **코인봇 (실전 운용 단계, 2026-07-28~)** — 검증 2전략(BTC정배열→알트돌파 / 오픈쇼크→알트추종) + 부정지식 필터. **봇 원장에 기록된 포지션만 관리 (기존 보유 자산 불가침)**, `--budget`은 원장 시드이며 이후 사이징은 원장 자산 비례(복리). 원장에 생성 모드 기록 — 실행 모드와 불일치 시 기동 거부, 무인 live는 `--live --yes`
 - `apps/bot_scalper`: 단타봇 (분봉 기반 — 분봉 전략 게이트 통과 후 본격 개발)
 - 예정: `apps/commander` (레짐 판별 → 정책 발행), `packages/broker_upbit`
 - `wiki/`: LLM-wiki (아래 스키마 참고)

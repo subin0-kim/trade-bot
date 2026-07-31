@@ -14,7 +14,7 @@
 
 안전 (업비트는 모의투자 없음 — 실계좌):
   - 봇 원장(state 파일)에 기록된 포지션만 관리. 기존 보유 자산 절대 불가침
-  - 예산 상한(--budget) 내에서만 매수. dry-run 기본, --live만 실주문
+  - --budget은 원장 초기 시드 — 이후 사이징은 원장 자산 비례 (복리, 원장 밖 자산 불가침). dry-run 기본, --live만 실주문
 
 실행:
   uv run bot-coin                      # dry-run 1사이클
@@ -148,6 +148,22 @@ def or_gate(regimes: dict[str, tuple[str, int, dict]]) -> tuple[str, int]:
     return ("bull" if merged[days[-1]] else "off"), age
 
 
+def ledger_equity(broker: UpbitBroker, state) -> Decimal:
+    """원장 자산 = 현금 + 보유 포지션 평가액 (시세 실패 시 진입가 폴백).
+
+    사이징 기준 (2026-07-31 복리 정렬): 검증 백테스트는 '그 시점 자산의 비율'로
+    베팅하는 복리인데 라이브는 시작 예산 고정이었음 — 원장 자산 비례로 정렬.
+    원장 안의 돈만 계산하므로 기존 보유 자산 불가침은 그대로 유지된다.
+    """
+    total = Decimal(state.cash)
+    for symbol, pos in state.positions.items():
+        try:
+            total += broker.get_quote(symbol).price * Decimal(pos.quantity)
+        except Exception:
+            total += Decimal(pos.entry_price) * Decimal(pos.quantity)
+    return total
+
+
 def btc_open_shock(broker: UpbitBroker) -> float | None:
     """오늘 09~10시 BTC 수익률(%). 10시 이전이면 None."""
     now = datetime.now()
@@ -263,7 +279,8 @@ def main():
     parser.add_argument("--live", action="store_true", help="⚠️ 실계좌 실주문")
     parser.add_argument("--yes", action="store_true",
                         help="--live 확인 프롬프트 생략 (systemd 등 무인 실행용)")
-    parser.add_argument("--budget", type=int, default=1_000_000, help="봇 할당 예산(원)")
+    parser.add_argument("--budget", type=int, default=1_000_000,
+                        help="원장 초기 시드(원) — 첫 실행 시에만 사용, 이후 사이징은 원장 자산 비례(복리)")
     args = parser.parse_args()
 
     if args.live and not args.yes:
@@ -340,7 +357,8 @@ def main():
             place_sell(broker, state, events, pos, f"레짐 이탈({regime}) — 현금화", args.live)
 
     # ---------- 2) 코어 홀드 (BTC·ETH 각자 자체 레짐 게이트) ----------
-    core_each = Decimal(args.budget) * CORE_FRACTION / len(CORE_ASSETS)
+    ledger_eq = ledger_equity(broker, state)  # 복리: 사이징 기준 = 원장 자산 (예산 고정 아님)
+    core_each = ledger_eq * CORE_FRACTION / len(CORE_ASSETS)
     for sym in CORE_ASSETS:
         r = regimes[sym][0]
         if r == "bull" and sym not in state.positions:
@@ -398,7 +416,7 @@ def main():
         candidates.sort(key=lambda c: (-c[0], c[1]))
         if candidates:
             logger.info("돌파 후보 %d개 (슬롯 %d)", len(candidates), slots)
-        per_slot = (Decimal(args.budget) * (1 - CORE_FRACTION)
+        per_slot = (ledger_eq * (1 - CORE_FRACTION)
                     * Decimal("0.9") / MAX_BREAKOUT_POSITIONS)
         for score, symbol, decision in candidates[:slots]:
             surge = prev_day_surge(broker, symbol)
@@ -412,12 +430,7 @@ def main():
         logger.info("레짐 %s — 신규 돌파 진입 없음", regime)
 
     # ---------- 5) 자산 스냅샷 + 저장 ----------
-    equity = Decimal(state.cash)
-    for symbol, pos in state.positions.items():
-        try:
-            equity += broker.get_quote(symbol).price * Decimal(pos.quantity)
-        except Exception:
-            equity += Decimal(pos.entry_price) * Decimal(pos.quantity)
+    equity = ledger_equity(broker, state)
     events.append("equity", {"equity": str(equity), "cash": state.cash,
                              "n_positions": len(state.positions), "mode": mode,
                              "regime": regime})
