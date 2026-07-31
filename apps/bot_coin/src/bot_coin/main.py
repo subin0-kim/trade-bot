@@ -48,7 +48,7 @@ DATA_DIR = Path(os.environ.get("TRADING_DATA_DIR", "data"))
 STATE_PATH = DATA_DIR / "state" / f"{BOT_NAME}.json"
 EVENTS_PATH = DATA_DIR / "events" / f"{BOT_NAME}.jsonl"
 
-MAX_BREAKOUT_POSITIONS = 4
+MAX_BREAKOUT_POSITIONS = 8   # 검증 구성과 정렬 (2026-07-31: 4슬롯은 -98%p·MDD↑, 얕고 넓게)
 SHOCK_THRESHOLD_PCT = 1.0
 SHOCK_BASKET_N = 10          # 쇼크 이벤트 시 매수할 알트 수 (24h 거래대금 상위)
 SURGE_SKIP_PCT = 20.0        # 전일 급등 진입 금지 임계
