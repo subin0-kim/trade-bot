@@ -29,7 +29,7 @@ from minute1_backtest import CACHE_1M, load_1m
 CACHE_BN = Path("data/cache/binance/1m")
 COST = 0.2               # 왕복 %
 LAGS = range(-3, 4)
-JUMPS = [0.003, 0.005, 0.010]
+JUMPS = [0.020, 0.010, 0.005, 0.003]  # 큰 버킷 우선 매칭 (내림차순 필수)
 
 
 def load_binance_closes(pair: str) -> dict:
@@ -139,7 +139,7 @@ def main():
     print(f"  역방향 (업비트[t]→바이낸스[t+1]): {statistics.mean(rev_corrs):+.4f}")
 
     print("\n== 2) 바이낸스 급등 → 업비트 추격 매수 (순수익, 비용 0.2% 차감) ==")
-    for j in JUMPS:
+    for j in sorted(JUMPS):
         for cond in ("지연", "동반"):
             row = []
             for h in (1, 3, 5, 15):
