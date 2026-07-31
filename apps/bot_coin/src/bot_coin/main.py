@@ -80,12 +80,13 @@ def completed_240m(broker: UpbitBroker, symbol: str, count: int = 120):
     return [b for b in bars if b.ts + timedelta(minutes=240) <= now]
 
 
-def asset_regime(broker: UpbitBroker, symbol: str) -> tuple[str, int]:
+def asset_regime(broker: UpbitBroker, symbol: str) -> tuple[str, int, dict]:
     """자산 일봉 앙상블 레짐 — {ROC30>0, SuperTrend(10,3), MA10>MA30} 2/3 다수결.
 
-    반환: (레짐, 초록불 연속일수). BTC 레짐이 위성/쇼크의 신호이고,
-    코어는 자산별 자체 레짐으로 게이트한다 (BTC 기준을 ETH에 튜닝 없이 이식 — 일반화 검증 ✓).
-    위성(돌파) 진입은 BTC 초록불 5일차부터만 — 전환 직후 깜빡임 구간 패배 실측.
+    반환: (레짐, 초록불 연속일수, 일자별 플래그). 코어는 자산별 자체 레짐으로 게이트하고
+    (BTC 기준을 ETH에 튜닝 없이 이식 — 일반화 검증 ✓), 위성은 BTC∪ETH OR 게이트
+    (2026-07-31 실측: 최악 반쪽 +22.8→+40.2, or_gate 참조) — 일자별 플래그는 그 합집합 계산용.
+    위성(돌파) 진입은 OR 초록불 5일차부터만 — 전환 직후 깜빡임 구간 패배 실측.
 
     2026-07 기준 심사: 3개 강건 가족의 다수결이 '가장 나쁜 반쪽' 최고
     (wiki/crypto-regime-findings). 단일 기준(MA10/30/60 정배열)은 후반 취약으로 교체됨.
@@ -98,7 +99,7 @@ def asset_regime(broker: UpbitBroker, symbol: str) -> tuple[str, int]:
     done = [c for c in daily if c.ts.date() < date.today()]
     xs = closes(done)
     if len(xs) < 65:
-        return "unknown", 0
+        return "unknown", 0, {}
     r30 = roc(xs, 30)
     st, _ = supertrend(done, 10, 3.0)
     ma10, ma30 = sma(xs, 10), sma(xs, 30)
@@ -120,7 +121,31 @@ def asset_regime(broker: UpbitBroker, symbol: str) -> tuple[str, int]:
                 "○" if (r30[-1] or 0) > 0 else "×",
                 "○" if st[-1] == 1 else "×",
                 "○" if (ma10[-1] or 0) > (ma30[-1] or 1) else "×", bull_age)
-    return ("bull" if flags[-1] else "off"), bull_age
+    by_date = {done[i].ts.date(): flags[i] for i in range(len(done))}
+    return ("bull" if flags[-1] else "off"), bull_age, by_date
+
+
+def or_gate(regimes: dict[str, tuple[str, int, dict]]) -> tuple[str, int]:
+    """위성 게이트 — 코어 자산들의 일자별 플래그 합집합(OR)으로 레짐·연속일수 계산.
+
+    근거 (2026-07-31 실측, wiki/crypto-regime-findings): BTC 단독 대비 최악 반쪽
+    +22.8→+40.2, MDD·PF 동등, 스위치 감소. ETH 단독은 BTC보다 약함 → 개선 원천은
+    커버리지 분산 (지표 3종 다수결과 같은 원리의 자산 축 확장). AND는 후반 붕괴로 기각.
+    한쪽이 unknown(플래그 없음)이면 남은 쪽만으로 판정 — 둘 다 없으면 unknown (보수 모드).
+    """
+    merged: dict = {}
+    for _, _, flags in regimes.values():
+        for d, f in flags.items():
+            merged[d] = merged.get(d, False) or f
+    if not merged:
+        return "unknown", 0
+    days = sorted(merged)
+    age = 0
+    for d in reversed(days):
+        if not merged[d]:
+            break
+        age += 1
+    return ("bull" if merged[days[-1]] else "off"), age
 
 
 def btc_open_shock(broker: UpbitBroker) -> float | None:
@@ -274,8 +299,9 @@ def main():
 
     universe = load_universe(broker)
     regimes = {sym: asset_regime(broker, sym) for sym in CORE_ASSETS}
-    regime, bull_age = regimes["KRW-BTC"]  # BTC 레짐 = 위성/쇼크의 신호
-    logger.info("BTC 레짐: %s (%d일째) | 유니버스 %d종목", regime.upper(), bull_age, len(universe))
+    regime, bull_age = or_gate(regimes)  # 위성 게이트 = BTC∪ETH OR (쇼크는 레짐 무관)
+    logger.info("위성 게이트(BTC∪ETH): %s (%d일째) | 유니버스 %d종목",
+                regime.upper(), bull_age, len(universe))
 
     breakout = build_preset("breakout_momo")
     now = datetime.now()
@@ -288,7 +314,7 @@ def main():
             continue
         if pos.strategy in ("btc_core", "core"):
             # 코어는 돌파 규칙이 아니라 해당 자산의 자체 레짐 신호로만 청산
-            r, _ = regimes.get(pos.symbol) or asset_regime(broker, pos.symbol)
+            r = (regimes.get(pos.symbol) or asset_regime(broker, pos.symbol))[0]
             if r != "bull":
                 place_sell(broker, state, events, pos, f"레짐 이탈({r}) — 코어 청산", args.live)
             continue
@@ -316,7 +342,7 @@ def main():
     # ---------- 2) 코어 홀드 (BTC·ETH 각자 자체 레짐 게이트) ----------
     core_each = Decimal(args.budget) * CORE_FRACTION / len(CORE_ASSETS)
     for sym in CORE_ASSETS:
-        r, _ = regimes[sym]
+        r = regimes[sym][0]
         if r == "bull" and sym not in state.positions:
             amount = min(core_each, Decimal(state.cash) * Decimal("0.95"))
             place_buy(broker, state, events, sym, amount, "core",
@@ -381,7 +407,7 @@ def main():
                 continue
             amount = min(per_slot, Decimal(state.cash) * Decimal("0.95"))
             place_buy(broker, state, events, symbol, amount, "bull_breakout",
-                      list(decision.reasons) + [f"BTC레짐:{regime}"], args.live)
+                      list(decision.reasons) + [f"게이트(BTC∪ETH):{regime}"], args.live)
     elif regime != "bull":
         logger.info("레짐 %s — 신규 돌파 진입 없음", regime)
 
