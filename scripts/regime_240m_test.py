@@ -107,11 +107,13 @@ def main():
     print("  " + run_portfolio(make_strategy(states, 1.5), data), flush=True)
 
     from strategy_kit import build_preset
-    for label, params in (
-        ("A. 240m 지표 그대로 (시계 6배 빠름)", (30, 10, 3.0, 10, 30)),
-        ("B. 240m 기간 환산 (시계 동일)", (180, 60, 3.0, 60, 180)),
+    btc360 = to_timeframe(btc5, "360m")
+    for label, bars, params in (
+        ("A. 240m 지표 그대로 (시계 6배 빠름)", btc240, (30, 10, 3.0, 10, 30)),
+        ("B. 240m 기간 환산 (시계 동일)", btc240, (180, 60, 3.0, 60, 180)),
+        ("C. 360m 기간 환산 (시계 동일, 주기 6h)", btc360, (120, 40, 3.0, 40, 120)),
     ):
-        flags = flags_from_bars(btc240, *params)
+        flags = flags_from_bars(bars, *params)
         preset = build_preset("breakout_momo")  # vol 1.5 기본 내장
         strat = TsRegimeMapped(f"ens240_{label[:1]}", flags, preset)
         print(f"[{label}] | 스위치 {switches(flags)}회")
