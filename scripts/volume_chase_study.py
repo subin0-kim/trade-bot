@@ -30,10 +30,12 @@ COOLDOWN = 30
 TIMEOUT = 30
 KS = [10, 30]
 TARGETS = [0.01, 0.02]
+STOPS = [None, 0.01, 0.02]      # 1분 종가 기준 손절 (None = 무손절)
 
 
 def main():
-    results: dict[tuple[int, float], list] = {(k, t): [] for k in KS for t in TARGETS}
+    results: dict[tuple[int, float, float | None], list] = {
+        (k, t, s): [] for k in KS for t in TARGETS for s in STOPS}
     day_counter: dict[int, set] = {k: set() for k in KS}
     all_last = None
 
@@ -60,13 +62,18 @@ def main():
                         entry = closes[i0]
                         for t in TARGETS:
                             tgt = entry * (1 + t)
-                            px, off = closes[i0 + TIMEOUT], TIMEOUT
-                            for j in range(i0 + 1, i0 + TIMEOUT + 1):
-                                if highs[j] >= tgt:
-                                    px, off = tgt, j - i0
-                                    break
-                            net = (px / entry - 1) * 100 - COST
-                            results[(k, t)].append((bars[i].ts, net, off))
+                            for s in STOPS:
+                                stp = entry * (1 - s) if s else None
+                                px, off = closes[i0 + TIMEOUT], TIMEOUT
+                                for j in range(i0 + 1, i0 + TIMEOUT + 1):
+                                    if stp and closes[j] <= stp:
+                                        px, off = closes[j], j - i0
+                                        break
+                                    if highs[j] >= tgt:
+                                        px, off = tgt, j - i0
+                                        break
+                                net = (px / entry - 1) * 100 - COST
+                                results[(k, t, s)].append((bars[i].ts, net, off))
             vsum += vols[i] - vols[i - VMA_N]
 
     boundary = all_last.date() - timedelta(days=365)
@@ -76,18 +83,18 @@ def main():
         n_days = len({d for _, d in day_counter[k]})
         print(f"[K={k}배] 심볼-일 {len(day_counter[k]):,}건")
         for t in TARGETS:
-            evts = results[(k, t)]
-            for label, sel in (("전체", evts),
-                              ("상승년", [e for e in evts if e[0].date() < boundary]),
-                              ("하락년", [e for e in evts if e[0].date() >= boundary])):
-                vals = [v for _, v, _ in sel]
+            for s in STOPS:
+                evts = results[(k, t, s)]
+                vals = [v for _, v, _ in evts]
                 if not vals:
                     continue
+                a = [v for ts, v, _ in evts if ts.date() < boundary]
+                b = [v for ts, v, _ in evts if ts.date() >= boundary]
                 pos = sum(1 for v in vals if v > 0) / len(vals) * 100
-                hold = statistics.mean(o for _, _, o in sel)
-                print(f"  목표+{t*100:.0f}% {label:<4}: n={len(vals):,} | "
+                stag = "무손절" if s is None else f"손절-{s*100:.0f}%"
+                print(f"  목표+{t*100:.0f}%/{stag:<6}: n={len(vals):,} | "
                       f"기대값 {statistics.mean(vals):+.3f}% | 승률 {pos:.0f}% | "
-                      f"평균 보유 {hold:.0f}분")
+                      f"상승년 {statistics.mean(a):+.3f}% / 하락년 {statistics.mean(b):+.3f}%")
         print()
 
 
