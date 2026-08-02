@@ -1,0 +1,22 @@
+[project]
+name = "bot-scalper-coin"
+version = "0.1.0"
+description = "코인 단타봇 — 2단 지정가 사다리 (업비트)"
+requires-python = ">=3.11"
+dependencies = [
+    "trading-core",
+    "broker-upbit",
+    "bot-coin",
+]
+
+[project.scripts]
+bot-scalper-coin = "bot_scalper_coin.main:main"
+
+[tool.uv.sources]
+trading-core = { workspace = true }
+broker-upbit = { workspace = true }
+bot-coin = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

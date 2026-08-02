@@ -775,3 +775,10 @@
   광폭 중지(8종), 경보 종목 제외 + market_flags.jsonl 선수집 로깅
 - --profile 4종 (insurance 20×5 / aggressive 25×4 / very-aggressive 33×3 / high-risk 50×2 기본)
 - 별도 원장(모드 가드), 이벤트 로그 → 대시보드 자동 합류. 드라이런 1사이클 검증 완료
+
+## [2026-08-02] fix | 코인 단타봇을 bot_scalper_coin으로 분리 — KIS 주식 스텁 원복
+
+- 실수 정정: 코인 단타봇을 KIS 기반 bot_scalper 위에 덮어썼던 것을 분리
+  (주식 단타봇과 코인 단타봇은 별개 — 사용자 지적). bot_swing은 무영향 확인
+- apps/bot_scalper = KIS 주식 스텁 원복, apps/bot_scalper_coin = 코인 단타봇 (bot-scalper-coin)
+- 원장·이벤트 네임스페이스도 bot_scalper_coin으로 분리, 양쪽 실행 검증 완료

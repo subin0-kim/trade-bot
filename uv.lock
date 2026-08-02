@@ -6,6 +6,7 @@ requires-python = ">=3.11"
 members = [
     "bot-coin",
     "bot-scalper",
+    "bot-scalper-coin",
     "bot-swing",
     "broker-kis",
     "broker-upbit",
@@ -49,6 +50,23 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "broker-kis", editable = "packages/broker_kis" },
+    { name = "trading-core", editable = "packages/core" },
+]
+
+[[package]]
+name = "bot-scalper-coin"
+version = "0.1.0"
+source = { editable = "apps/bot_scalper_coin" }
+dependencies = [
+    { name = "bot-coin" },
+    { name = "broker-upbit" },
+    { name = "trading-core" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "bot-coin", editable = "apps/bot_coin" },
+    { name = "broker-upbit", editable = "packages/broker_upbit" },
     { name = "trading-core", editable = "packages/core" },
 ]
 
@@ -287,6 +305,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "bot-coin" },
     { name = "bot-scalper" },
+    { name = "bot-scalper-coin" },
     { name = "bot-swing" },
     { name = "broker-upbit" },
     { name = "strategy-kit" },
@@ -300,6 +319,7 @@ dependencies = [
 requires-dist = [
     { name = "bot-coin", editable = "apps/bot_coin" },
     { name = "bot-scalper", editable = "apps/bot_scalper" },
+    { name = "bot-scalper-coin", editable = "apps/bot_scalper_coin" },
     { name = "bot-swing", editable = "apps/bot_swing" },
     { name = "broker-upbit", editable = "packages/broker_upbit" },
     { name = "strategy-kit", editable = "packages/strategy_kit" },
