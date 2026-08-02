@@ -5,7 +5,8 @@ description = "단타봇 — 분봉 기반 데이트레이딩"
 requires-python = ">=3.11"
 dependencies = [
     "trading-core",
-    "broker-kis",
+    "broker-upbit",
+    "bot-coin",
 ]
 
 [project.scripts]
@@ -13,7 +14,8 @@ bot-scalper = "bot_scalper.main:main"
 
 [tool.uv.sources]
 trading-core = { workspace = true }
-broker-kis = { workspace = true }
+broker-upbit = { workspace = true }
+bot-coin = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]
