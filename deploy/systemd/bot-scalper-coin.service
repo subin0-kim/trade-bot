@@ -1,0 +1,21 @@
+[Unit]
+Description=코인 단타봇 상주 루프 (dry-run — 2단 지정가 사다리, 1분 주기)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=trading
+WorkingDirectory=/opt/stock-trade-bot
+Environment=TZ=Asia/Seoul
+Environment=UPBIT_CONFIG_PATH=/etc/trading/upbit.yaml
+Environment=KIS_CONFIG_PATH=/etc/trading/kis_devlp.yaml
+# --budget은 원장 초기 시드(원). 원장(data/state)은 첫 체결 때 생성되므로
+# 그 전까지는 기동마다 이 값이 시드로 쓰인다 — 임의로 빼거나 바꾸지 말 것.
+# live 전환 시 --live --yes 추가 (원장 모드 불일치 시 기동 거부 — 코인봇과 동일 절차)
+ExecStart=/bin/bash -lc 'uv run bot-scalper-coin --budget 10000000'
+Restart=on-failure
+RestartSec=60
+
+[Install]
+WantedBy=multi-user.target
