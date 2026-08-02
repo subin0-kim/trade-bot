@@ -81,6 +81,13 @@ def fmt_krw(v: float) -> str:
     return f"{v:,.0f}원"
 
 
+def fmt_price(v: float) -> str:
+    """체결가 표기 — 1,000원 미만은 소수점 유지 (SHIB 등 1원 미만 코인이 0으로 뭉개짐 방지)."""
+    if v >= 1000:
+        return f"{v:,.0f}"
+    return f"{v:.8f}".rstrip("0").rstrip(".") or "0"
+
+
 # ------------------------------------------------------------------ 차트
 def equity_chart_svg(bots: list[BotMetrics], width: int = 1020, height: int = 260) -> str:
     """자산 곡선 (봇별 시리즈, 크로스헤어 툴팁)."""
@@ -257,7 +264,7 @@ def trades_table(bot: BotMetrics, limit: int = 14) -> str:
             f"<tr><td>{e['ts'][:10]}</td>"
             f"<td>{html.escape(e.get('name', e['symbol']))}</td>"
             f"<td>{html.escape(e.get('strategy', ''))}</td>"
-            f"<td class='num'>{float(e['entry_price']):,.0f} → {float(e['exit_price']):,.0f}</td>"
+            f"<td class='num'>{fmt_price(float(e['entry_price']))} → {fmt_price(float(e['exit_price']))}</td>"
             f"<td class='num'>{fmt_pct(e.get('pnl_pct', 0.0))}</td>"
             f"<td>{chip}</td>"
             f"<td class='reason' title='{reasons_full}'>{reasons_full}</td></tr>"
@@ -269,7 +276,7 @@ def trades_table(bot: BotMetrics, limit: int = 14) -> str:
             f"<tr><td>{e['ts'][:10]}</td>"
             f"<td>{html.escape(e.get('name', e['symbol']))}</td>"
             f"<td>{html.escape(e.get('strategy', ''))}</td>"
-            f"<td class='num'>{float(e['price']):,.0f} (보유중)</td>"
+            f"<td class='num'>{fmt_price(float(e['price']))} (보유중)</td>"
             f"<td class='num'>—</td><td><span class='chip'>보유</span></td>"
             f"<td class='reason' title='{reasons_full}'>{reasons_full}</td></tr>"
         )

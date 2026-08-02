@@ -12,6 +12,13 @@ from trading_core.models import OrderSide
 from .view import EntryEvent, MarketView
 
 
+def _fmt_px(v: float) -> str:
+    """사유 문자열용 가격 표기 — 1,000원 미만은 소수점 유지 (1원 미만 코인이 0으로 뭉개짐 방지)."""
+    if v >= 1000:
+        return f"{v:,.0f}"
+    return f"{v:.8f}".rstrip("0").rstrip(".") or "0"
+
+
 def _momentum_score(view: MarketView, period: int = 60) -> float:
     """추세·돌파 계열 공통 랭킹 점수 — N봉 수익률(%).
 
@@ -109,7 +116,7 @@ class BreakoutEntry:
         if close > level:
             return EntryEvent(
                 OrderSide.BUY, 0.7,
-                f"{self.lookback}봉 신고가 돌파: 종가 {close:.0f} > 전고 {level:.0f}",
+                f"{self.lookback}봉 신고가 돌파: 종가 {_fmt_px(close)} > 전고 {_fmt_px(level)}",
                 score=_momentum_score(view),
             )
         return None
